@@ -1,0 +1,101 @@
+/** @jsxImportSource react */
+import React from 'react';
+import { 
+  Home, Send, History, FileText, Settings, Users, 
+  BarChart2, FileQuestion, Bell, CreditCard, HelpCircle, Tag, Building
+} from 'lucide-react';
+
+export interface RouteItem {
+  path: string;
+  label: string;
+  icon: React.ReactNode;
+  requiredPermissions?: string[];
+  requiredRoles?: string[];
+}
+
+// アイコンを作成する関数
+const createIcon = (Icon: any) => React.createElement(Icon, {});
+
+export const SIDEBAR_ROUTES: RouteItem[] = [
+  {
+    path: '/dashboard',
+    label: 'ダッシュボード',
+    icon: createIcon(Home),
+  },
+  {
+    path: '/dashboard/send',
+    label: 'SMS送信',
+    icon: createIcon(Send),
+  },
+  {
+    path: '/dashboard/history',
+    label: '送信履歴管理',
+    icon: createIcon(History),
+  },
+  {
+    path: '/dashboard/templates',
+    label: 'テンプレート管理',
+    icon: createIcon(FileText),
+  },
+  {
+    path: '/dashboard/tags',
+    label: 'タグ管理',
+    icon: createIcon(Tag),
+  },
+  {
+    path: '/dashboard/surveys',
+    label: 'アンケート管理',
+    icon: createIcon(FileQuestion),
+    requiredPermissions: ['surveysCreation'],
+  },
+  {
+    path: '/dashboard/analytics',
+    label: '分析',
+    icon: createIcon(BarChart2),
+  },
+  {
+    path: '/dashboard/users',
+    label: 'ユーザー管理',
+    icon: createIcon(Users),
+    requiredPermissions: ['userManagement'],
+    requiredRoles: ['SYSTEM_ADMIN', 'TENANT_ADMIN'],
+  },
+  {
+    path: '/dashboard/settings',
+    label: '設定',
+    icon: createIcon(Settings),
+  },
+  {
+    path: '/dashboard/support',
+    label: 'ヘルプ＆サポート',
+    icon: createIcon(HelpCircle),
+  },
+];
+
+// 設定画面のタブメニュー定義
+export type SettingsTab = 
+  | 'security' 
+  | 'notifications' 
+  | 'billing' 
+  | 'messaging' 
+  | 'support'
+  | 'tenant';
+
+export const SETTINGS_ROUTES: {id: SettingsTab, label: string, icon: React.ReactNode, requiredRoles?: string[]}[] = [
+  {
+    id: 'tenant',
+    label: 'テナント設定',
+    icon: createIcon(Building),
+    requiredRoles: ['SYSTEM_ADMIN', 'TENANT_ADMIN'],
+  },
+  {
+    id: 'notifications',
+    label: '通知設定',
+    icon: createIcon(Bell),
+  },
+  {
+    id: 'billing',
+    label: '請求・支払い',
+    icon: createIcon(CreditCard),
+  }
+];

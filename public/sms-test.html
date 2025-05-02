@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SMS文字数と通数計算テスト</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    .pass {
+      color: green;
+      font-weight: bold;
+    }
+    .fail {
+      color: red;
+      font-weight: bold;
+    }
+    .result-section {
+      margin-top: 30px;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
+    }
+    pre {
+      background-color: #f5f5f5;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>SMS文字数と通数計算テスト</h1>
+
+  <div class="input-section">
+    <h2>テキスト入力テスト</h2>
+    <textarea id="test-input" rows="5" style="width: 100%;" placeholder="テキストを入力してテスト..."></textarea>
+    <div>
+      <button id="calculate-btn">計算</button>
+      <span id="character-count">文字数: 0 / 660文字</span>
+      <span id="message-count" style="margin-left: 10px;"></span>
+    </div>
+  </div>
+
+  <div class="result-section">
+    <h2>テスト結果</h2>
+    <table id="test-results">
+      <thead>
+        <tr>
+          <th>テスト内容</th>
+          <th>テキスト</th>
+          <th>文字数</th>
+          <th>計算文字数</th>
+          <th>期待通数</th>
+          <th>計算通数</th>
+          <th>結果</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- テスト結果がここに表示されます -->
+      </tbody>
+    </table>
+  </div>
+
+  <div class="code-section">
+    <h2>実装コード</h2>
+    <pre id="implementation-code"></pre>
+  </div>
+
+  <script>
+    // SMS文字数制限値の定数
+    const SMS_CHARACTER_LIMITS = {
+      STANDARD: 70,  // 通常SMS: 70文字
+      DOCOMO_LONG: 660,  // ドコモ長文SMS: 660文字
+      OTHER_LONG: 670,  // au/SoftBank/楽天 長文SMS: 670文字
+      SMS_LIMIT: 660,  // 統一された文字数上限: 660文字
+      URL_HTTP: 19,  // HTTP短縮URL: 19文字
+      URL_HTTPS: 20,  // HTTPS短縮URL: 20文字
+      LINE_BREAK: 2,  // 改行コード: 2文字分
+      SEGMENT_SIZE: 66,  // 長文SMS分割サイズ: 66文字
+    };
+
+    // SMSメッセージの文字数を計算する
+    function calculateSMSLength(text) {
+      if (!text) return 0;
+      
+      // 改行を2文字としてカウント（元の\nを削除して2文字分追加）
+      let processedText = text.replace(/\n/g, '##');
+      
+      // URLタグを短縮URL文字数に置き換え
+      processedText = processedText.replace(/{URL(\d*)}/g, (match, p1) => {
+        // HTTPSの場合は20文字、HTTP(または不明)の場合は19文字と仮定
+        return '#'.repeat(SMS_CHARACTER_LIMITS.URL_HTTPS);
+      });
+      
+      return processedText.length;
+    }
+
+    // 通常SMS 1通分に相当する文字数を計算
+    function calculateSMSMessageCount(text) {
+      const length = calculateSMSLength(text);
+      const standardLimit = SMS_CHARACTER_LIMITS.STANDARD;
+      const segmentSize = SMS_CHARACTER_LIMITS.SEGMENT_SIZE;
+      
+      if (length === 0) return 0;
+      
+      // 70文字までは1通
+      if (length <= standardLimit) {
+        return 1;
+      }
+      
+      // 70文字を超えた場合は、超過分を66文字ごとに分割して1を足す
+      return 1 + Math.ceil((length - standardLimit) / segmentSize);
+    }
+
+    // テストケースの定義
+    const testCases = [
+      {
+        description: '空文字列のテスト',
+        text: '',
+        expectedLength: 0,
+        expectedMessageCount: 0
+      },
+      {
+        description: '70文字以下のテスト（1通）',
+        text: 'A'.repeat(65),
+        expectedLength: 65,
+        expectedMessageCount: 1
+      },
+      {
+        description: '70文字ちょうどのテスト（1通）',
+        text: 'A'.repeat(70),
+        expectedLength: 70,
+        expectedMessageCount: 1
+      },
+      {
+        description: '71文字のテスト（2通）',
+        text: 'A'.repeat(71),
+        expectedLength: 71,
+        expectedMessageCount: 2
+      },
+      {
+        description: '136文字のテスト（70+66, 2通）',
+        text: 'A'.repeat(136),
+        expectedLength: 136,
+        expectedMessageCount: 2
+      },
+      {
+        description: '137文字のテスト（70+66+1, 3通）',
+        text: 'A'.repeat(137),
+        expectedLength: 137,
+        expectedMessageCount: 3
+      },
+      {
+        description: '202文字のテスト（70+66+66, 3通）',
+        text: 'A'.repeat(202),
+        expectedLength: 202,
+        expectedMessageCount: 3
+      },
+      {
+        description: '203文字のテスト（70+66+66+1, 4通）',
+        text: 'A'.repeat(203),
+        expectedLength: 203,
+        expectedMessageCount: 4
+      },
+      {
+        description: '350文字のテスト（70+66*5=400文字で6通）',
+        text: 'A'.repeat(350),
+        expectedLength: 350,
+        expectedMessageCount: 6
+      },
+      {
+        description: '660文字ちょうどのテスト（70+66*9=664文字で10通）',
+        text: 'A'.repeat(660),
+        expectedLength: 660,
+        expectedMessageCount: 10
+      },
+      {
+        description: '改行を含むテスト',
+        text: 'こんにちは\nお元気ですか？',
+        expectedLength: 14, // 11文字 + 改行1つ(2文字分)
+        expectedMessageCount: 1
+      },
+      {
+        description: 'URLタグを含むテスト',
+        text: 'こちらのリンクをクリックしてください: {URL1}',
+        expectedLength: 21 + SMS_CHARACTER_LIMITS.URL_HTTPS, // 「こちらのリンクをクリックしてください: 」(21文字) + URL(20文字)
+        expectedMessageCount: 1
+      },
+      {
+        description: '複数のURLタグを含むテスト',
+        text: 'リンク1: {URL1} またはリンク2: {URL2}',
+        expectedLength: 20 + (SMS_CHARACTER_LIMITS.URL_HTTPS * 2), // 「リンク1:  またはリンク2: 」(20文字) + URL(20文字) x 2
+        expectedMessageCount: 1
+      }
+    ];
+
+    // 実装コードの表示
+    document.getElementById('implementation-code').textContent = 
+`// SMS文字数計算
+function calculateSMSLength(text) {
+  if (!text) return 0;
+  
+  // 改行を2文字としてカウント（元の\\nを削除して2文字分追加）
+  let processedText = text.replace(/\\n/g, '##');
+  
+  // URLタグを短縮URL文字数に置き換え
+  processedText = processedText.replace(/{URL(\\d*)}/g, (match, p1) => {
+    // HTTPSの場合は20文字分としてカウント
+    return '#'.repeat(20);
+  });
+  
+  return processedText.length;
+}
+
+// SMS通数計算
+function calculateSMSMessageCount(text) {
+  const length = calculateSMSLength(text);
+  
+  if (length === 0) return 0;
+  
+  // 70文字までは1通
+  if (length <= 70) {
+    return 1;
+  }
+  
+  // 70文字を超えた場合は、超過分を66文字ごとに分割して1を足す
+  return 1 + Math.ceil((length - 70) / 66);
+}`;
+
+    // テストの実行と結果表示
+    function runTests() {
+      const tableBody = document.getElementById('test-results').getElementsByTagName('tbody')[0];
+      tableBody.innerHTML = '';
+      
+      let passedCount = 0;
+      
+      testCases.forEach(testCase => {
+        const calcLength = calculateSMSLength(testCase.text);
+        const calcMessageCount = calculateSMSMessageCount(testCase.text);
+        
+        const isPassed = calcLength === testCase.expectedLength && calcMessageCount === testCase.expectedMessageCount;
+        if (isPassed) passedCount++;
+        
+        const row = tableBody.insertRow();
+        
+        row.insertCell(0).textContent = testCase.description;
+        row.insertCell(1).textContent = testCase.text.length > 20 ? testCase.text.substring(0, 20) + '...' : testCase.text;
+        row.insertCell(2).textContent = testCase.text.length;
+        row.insertCell(3).textContent = calcLength;
+        row.insertCell(4).textContent = testCase.expectedMessageCount;
+        row.insertCell(5).textContent = calcMessageCount;
+        
+        const resultCell = row.insertCell(6);
+        resultCell.textContent = isPassed ? '成功' : '失敗';
+        resultCell.className = isPassed ? 'pass' : 'fail';
+      });
+      
+      // 合計結果の行を追加
+      const summaryRow = tableBody.insertRow();
+      summaryRow.insertCell(0).textContent = '合計結果';
+      summaryRow.insertCell(1).textContent = '';
+      summaryRow.insertCell(2).textContent = '';
+      summaryRow.insertCell(3).textContent = '';
+      summaryRow.insertCell(4).textContent = '';
+      summaryRow.insertCell(5).textContent = '';
+      
+      const summaryResultCell = summaryRow.insertCell(6);
+      summaryResultCell.textContent = `${passedCount}/${testCases.length} 成功`;
+      summaryResultCell.className = passedCount === testCases.length ? 'pass' : 'fail';
+    }
+
+    // ユーザー入力に対するリアルタイム計算
+    document.getElementById('test-input').addEventListener('input', function(e) {
+      const text = e.target.value;
+      const charCount = calculateSMSLength(text);
+      const msgCount = calculateSMSMessageCount(text);
+      
+      document.getElementById('character-count').textContent = `文字数: ${charCount} / 660文字`;
+      
+      if (msgCount > 1) {
+        document.getElementById('message-count').textContent = `${msgCount}通分`;
+      } else {
+        document.getElementById('message-count').textContent = '';
+      }
+    });
+
+    // 計算ボタンのイベントリスナー
+    document.getElementById('calculate-btn').addEventListener('click', function() {
+      const text = document.getElementById('test-input').value;
+      alert(`
+計算結果:
+文字数: ${calculateSMSLength(text)}
+通数: ${calculateSMSMessageCount(text)}
+`);
+    });
+
+    // ページ読み込み時にテストを実行
+    window.onload = runTests;
+  </script>
+</body>
+</html> 

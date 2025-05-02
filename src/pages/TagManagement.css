@@ -1,0 +1,17 @@
+.tag-management-page {
+  width: 100%;
+  height: auto;
+  overflow-y: visible;
+  overflow-x: hidden;
+}
+
+/* スクロールバーを非表示にする */
+.tag-management-page::-webkit-scrollbar {
+  display: none;
+}
+
+/* IE、Edgeなどのブラウザ向け */
+.tag-management-page {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+} 

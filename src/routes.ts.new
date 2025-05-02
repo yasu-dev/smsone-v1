@@ -1,0 +1,95 @@
+﻿/** @jsxImportSource react */
+import React from 'react';
+import { 
+  Home, Send, History, FileText, Settings, Users, 
+  BarChart2, FileQuestion, Bell, CreditCard, HelpCircle, Tag, Building
+} from 'lucide-react';
+
+export interface RouteItem {
+  path: string;
+  label: string;
+  icon: React.ReactNode;
+  requiredPermissions?: string[];
+  requiredRoles?: string[];
+}
+
+// 繧｢繧､繧ｳ繝ｳ繧剃ｽ懈・縺吶ｋ髢｢謨ｰ
+const createIcon = (Icon: any) => React.createElement(Icon, {});
+
+export const SIDEBAR_ROUTES: RouteItem[] = [
+  {
+    path: '/dashboard',
+    label: '繝繝・す繝･繝懊・繝・,
+    icon: createIcon(Home),
+  },
+  {
+    path: '/dashboard/send',
+    label: 'SMS騾∽ｿ｡',
+    icon: createIcon(Send),
+  },
+  {
+    path: '/dashboard/history',
+    label: '騾∽ｿ｡螻･豁ｴ邂｡逅・,
+    icon: createIcon(History),
+  },
+  {
+    path: '/dashboard/templates',
+    label: '繝・Φ繝励Ξ繝ｼ繝育ｮ｡逅・,
+    icon: createIcon(FileText),
+  },
+  {
+    path: '/dashboard/tags',
+    label: '繧ｿ繧ｰ邂｡逅・,
+    icon: createIcon(Tag),
+  },
+  {
+    path: '/dashboard/surveys',
+    label: '繧｢繝ｳ繧ｱ繝ｼ繝育ｮ｡逅・,
+    icon: createIcon(FileQuestion),
+    requiredPermissions: ['surveysCreation'],
+  },
+  {
+    path: '/dashboard/analytics',
+    label: '蛻・梵',
+    icon: createIcon(BarChart2),
+  },
+  {
+    path: '/dashboard/users',
+    label: '繝ｦ繝ｼ繧ｶ繝ｼ邂｡逅・,
+    icon: createIcon(Users),
+    requiredPermissions: ['userManagement'],
+    requiredRoles: ['SYSTEM_ADMIN', 'TENANT_ADMIN'],
+  },
+  {
+    path: '/dashboard/settings',
+    label: '險ｭ螳・,
+    icon: createIcon(Settings),
+  },
+  {
+    path: '/dashboard/support',
+    label: '繝倥Ν繝暦ｼ・し繝昴・繝・,
+    icon: createIcon(HelpCircle),
+  },
+];
+
+// 險ｭ螳夂判髱｢縺ｮ繧ｿ繝悶Γ繝九Η繝ｼ螳夂ｾｩ
+export type SettingsTab = 
+  | 'security' 
+  | 'billing' 
+  | 'messaging' 
+  | 'support'
+  | 'tenant';
+
+export const SETTINGS_ROUTES: {id: SettingsTab, label: string, icon: React.ReactNode, requiredRoles?: string[]}[] = [
+  {
+    id: 'tenant',
+    label: '繝・リ繝ｳ繝郁ｨｭ螳・,
+    icon: createIcon(Building),
+    requiredRoles: ['SYSTEM_ADMIN', 'TENANT_ADMIN'],
+  },
+  {
+    id: 'billing',
+    label: '隲区ｱゅ・謾ｯ謇輔＞',
+    icon: createIcon(CreditCard),
+  }
+];
