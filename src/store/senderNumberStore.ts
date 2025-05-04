@@ -17,16 +17,31 @@ const mockSenderNumbers: SenderNumber[] = [
   // 共通の電話番号（全ユーザー利用可能）
   { id: 'sender-1', number: '0120378777', description: 'カスタマーサポート', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true },
   { id: 'sender-2', number: '0120297888', description: 'カスタマーサポート', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true },
+  { id: 'sender-3', number: 'TOPAZ', description: '会社名表示（国内）', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: false },
+  
+  // 海外送信用共通送信者名
+  { id: 'sender-16', number: 'SMS_SERVICE', description: 'SMS配信サービス（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false },
+  { id: 'sender-17', number: 'INFO', description: 'インフォメーション（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false },
   
   // admin用の電話番号
-  { id: 'sender-3', number: '0433307000', description: '東京オフィス', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '1' },
-  { id: 'sender-4', number: '0433307011', description: '大阪オフィス', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '1' },
+  { id: 'sender-4', number: '0433307000', description: '東京オフィス', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '1' },
+  { id: 'sender-5', number: '0433307011', description: '大阪オフィス', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '1' },
+  { id: 'sender-6', number: 'TOPAZ Inc.', description: '会社名（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '1' },
+  { id: 'sender-7', number: 'Support', description: 'サポートセンター（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '1' },
   
   // user用の電話番号
-  { id: 'sender-5', number: '08012345678', description: 'グランドリバーホテル 東京', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '2' },
-  { id: 'sender-6', number: '08087654321', description: 'グランドリバーホテル 大阪', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '2' },
-  { id: 'sender-7', number: 'Grand River Hotel', description: '国際送信用（英語表記）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '2' },
-  { id: 'sender-8', number: 'グランドリバーホテル', description: '国際送信用（日本語表記）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '2' },
+  { id: 'sender-8', number: '08012345678', description: 'グランドリバーホテル 東京', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '2' },
+  { id: 'sender-9', number: '08087654321', description: 'グランドリバーホテル 大阪', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: '2' },
+  { id: 'sender-10', number: 'Grand River Hotel', description: '海外送信用（英語表記）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '2' },
+  { id: 'sender-11', number: 'グランドリバーホテル', description: '海外送信用（日本語表記）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: '2' },
+  
+  // 運用管理者用
+  { id: 'sender-12', number: '0311112222', description: 'サンプル会社', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: 'operation-1' },
+  { id: 'sender-13', number: 'Sample Inc.', description: '会社名（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: 'operation-1' },
+  
+  // 運用担当者用
+  { id: 'sender-14', number: '0322223333', description: 'サンプル部署', isActive: true, createdAt: new Date().toISOString(), isPhoneNumber: true, userId: 'operation-2' },
+  { id: 'sender-15', number: 'Sample Dept', description: '部署名（海外向け）', isActive: true, createdAt: new Date().toISOString(), isInternational: true, isPhoneNumber: false, userId: 'operation-2' },
 ];
 
 // モックキャリア別送信元番号マッピング
@@ -50,6 +65,7 @@ interface SenderNumberStore {
   addSenderNumber: (data: Partial<SenderNumber>) => Promise<void>;
   updateSenderNumber: (id: string, updates: Partial<SenderNumber>) => Promise<void>;
   deleteSenderNumber: (id: string) => Promise<void>;
+  canManageSenderNumbers: () => boolean;
 }
 
 const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
@@ -83,14 +99,24 @@ const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
 
   getAvailableSenderNumbers: (userId?: string) => {
     const { senderNumbers } = get();
+    const authStore = useAuthStore.getState();
+    const currentUser = authStore.user;
     
-    // フィルター条件：アクティブであること、そしてユーザーIDが指定されている場合は、
-    // 1. 共通の送信者名（userId未設定）
-    // 2. 指定されたユーザーIDに属する送信者名
+    // システム管理者かどうかチェック
+    const isSystemAdmin = currentUser?.role === 'SYSTEM_ADMIN';
+    
+    // 海外SMS送信権限があるかチェック
+    const hasInternationalSmsPermission = authStore.hasPermission('internationalSms');
+    
+    // フィルター条件：
+    // 1. アクティブであること
+    // 2. 共通の送信者名（userId未設定）か指定されたユーザーIDに属する送信者名
+    // 3. 国際送信用の送信者名は、海外SMS送信権限がある場合のみ表示
     return senderNumbers
       .filter(sn => 
         sn.isActive && 
-        (!userId || !sn.userId || sn.userId === userId)
+        (!userId || !sn.userId || sn.userId === userId) &&
+        (!sn.isInternational || hasInternationalSmsPermission)
       )
       .sort((a, b) => a.number.localeCompare(b.number));
   },
@@ -100,6 +126,12 @@ const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
   },
 
   addSenderNumber: async (data: Partial<SenderNumber>) => {
+    // システム管理者以外は送信者名を追加できない
+    if (!get().canManageSenderNumbers()) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     set({ isLoading: true, error: null });
     try {
       // Mock API call - replace with actual implementation
@@ -133,6 +165,12 @@ const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
   },
 
   updateSenderNumber: async (id: string, updates: Partial<SenderNumber>) => {
+    // システム管理者以外は送信者名を更新できない
+    if (!get().canManageSenderNumbers()) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     set({ isLoading: true, error: null });
     try {
       // Mock API call - replace with actual implementation
@@ -152,6 +190,12 @@ const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
   },
 
   deleteSenderNumber: async (id: string) => {
+    // システム管理者以外は送信者名を削除できない
+    if (!get().canManageSenderNumbers()) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     set({ isLoading: true, error: null });
     try {
       // Mock API call - replace with actual implementation
@@ -166,6 +210,12 @@ const useSenderNumberStore = create<SenderNumberStore>((set, get) => ({
         isLoading: false 
       });
     }
+  },
+  
+  // システム管理者のみ送信者名を管理できる
+  canManageSenderNumbers: () => {
+    const currentUser = useAuthStore.getState().user;
+    return currentUser?.role === 'SYSTEM_ADMIN';
   }
 }));
 

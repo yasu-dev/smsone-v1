@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   Home, Send, History, FileText, Settings, Users, 
   BarChart2, FileQuestion, Bell, CreditCard, HelpCircle, Tag, Building,
-  Receipt, Landmark, ScrollText, Briefcase
+  Receipt, Landmark, ScrollText, Briefcase, Plus, File, DollarSign
 } from 'lucide-react';
 
 export interface RouteItem {
@@ -71,29 +71,15 @@ export const SIDEBAR_ROUTES: RouteItem[] = [
       },
       {
         path: '/dashboard/users',
-        label: 'ユーザー管理',
+        label: '利用者管理',
         icon: createIcon(Users),
         requiredRoles: ['SYSTEM_ADMIN'],
       },
       {
-        path: '/dashboard/billing',
+        path: '/dashboard/invoices',
         label: '請求管理',
         icon: createIcon(CreditCard),
         requiredRoles: ['SYSTEM_ADMIN'],
-        children: [
-          {
-            path: '/dashboard/billing/users',
-            label: 'テナント向け請求管理',
-            icon: createIcon(Receipt),
-            requiredRoles: ['SYSTEM_ADMIN'],
-          },
-          {
-            path: '/dashboard/billing/endusers',
-            label: 'サービス利用者向け請求管理',
-            icon: createIcon(Receipt),
-            requiredRoles: ['SYSTEM_ADMIN'],
-          }
-        ]
       }
     ]
   },
@@ -105,24 +91,23 @@ export const SIDEBAR_ROUTES: RouteItem[] = [
     requiredRoles: ['TENANT_ADMIN'],
     children: [
       {
-        path: '/dashboard/users',
-        label: 'ユーザー管理',
+        path: '/dashboard/tenant-users',
+        label: '利用者管理',
         icon: createIcon(Users),
         requiredRoles: ['TENANT_ADMIN'],
       },
       {
-        path: '/dashboard/billing/users',
+        path: '/dashboard/invoices',
         label: '請求管理',
         icon: createIcon(CreditCard),
         requiredRoles: ['TENANT_ADMIN'],
-        children: []
       }
     ]
   },
   // 請求受領（テナント管理者、サービス利用者）
   {
     path: '/dashboard/invoices/received',
-    label: '請求受領',
+    label: '請求受領管理',
     icon: createIcon(ScrollText),
     requiredRoles: ['TENANT_ADMIN', 'OPERATION_ADMIN', 'OPERATION_USER'],
   },

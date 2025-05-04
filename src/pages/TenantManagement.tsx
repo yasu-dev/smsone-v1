@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import useAuthStore from '../store/authStore';
+import { useNavigate } from 'react-router-dom';
 
 // テナント情報の型定義
 interface TenantData {
@@ -25,6 +26,9 @@ interface TenantData {
   userCount: number;
   createdAt: string;
   contractEndDate: string;
+  monthlyFee: number;
+  domesticSmsPrice: number;
+  internationalSmsPrice: number;
 }
 
 const TenantManagement: React.FC = () => {
@@ -54,6 +58,9 @@ const TenantManagement: React.FC = () => {
     postalCode: '', // 追加：郵便番号
     phoneNumber: '', // 追加：電話番号
     address: '', // 追加：住所
+    monthlyFee: 0, // 追加：月額基本料金
+    domesticSmsPrice: 3.3, // 追加：国内SMS送信単価（デフォルト値）
+    internationalSmsPrice: 10, // 追加：海外SMS送信単価（デフォルト値）
     status: 'active' as 'active' | 'inactive' | 'pending'
   });
   
@@ -61,8 +68,9 @@ const TenantManagement: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // ユーザー情報
-  const { user } = useAuthStore();
+  // ユーザー情報とナビゲーション
+  const { user, setTenantContext } = useAuthStore();
+  const navigate = useNavigate();
   
   // 初期データ読み込み
   useEffect(() => {
@@ -77,93 +85,103 @@ const TenantManagement: React.FC = () => {
   // テナントデータ取得
   const fetchTenants = async () => {
     setIsLoading(true);
+    
     try {
-      // APIリクエストの代わりにモックデータを使用
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // APIリクエストシミュレーション
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const mockTenants = generateMockTenants();
-      setTenants(mockTenants);
-      setFilteredTenants(mockTenants);
+      // モックデータ
+      const mockData: TenantData[] = [
+        {
+          id: 'tenant-1',
+          name: 'サンプル株式会社',
+          domain: 'sample.co.jp',
+          subdomain: 'sample',
+          primaryColor: '#3B82F6',
+          secondaryColor: '#10B981',
+          logoUrl: 'https://placehold.co/200x80?text=サンプル株式会社',
+          contactEmail: 'contact@sample.co.jp',
+          postalCode: '100-0001',
+          phoneNumber: '03-1234-5678',
+          address: '東京都千代田区千代田1-1-1',
+          status: 'active',
+          userCount: 25,
+          createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
+          contractEndDate: new Date(Date.now() + 185 * 24 * 60 * 60 * 1000).toISOString(),
+          monthlyFee: 5000,
+          domesticSmsPrice: 3.3,
+          internationalSmsPrice: 10
+        },
+        {
+          id: 'tenant-2',
+          name: 'テスト企業',
+          domain: 'test-corp.jp',
+          subdomain: 'testcorp',
+          primaryColor: '#8B5CF6',
+          secondaryColor: '#EC4899',
+          logoUrl: 'https://placehold.co/200x80?text=テスト企業',
+          contactEmail: 'info@test-corp.jp',
+          postalCode: '160-0022',
+          phoneNumber: '03-9876-5432',
+          address: '東京都新宿区新宿3-3-3',
+          status: 'active',
+          userCount: 12,
+          createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+          contractEndDate: new Date(Date.now() + 275 * 24 * 60 * 60 * 1000).toISOString(),
+          monthlyFee: 3000,
+          domesticSmsPrice: 3.0,
+          internationalSmsPrice: 9.5
+        },
+        {
+          id: 'tenant-3',
+          name: '株式会社エグザンプル',
+          domain: 'example.com',
+          subdomain: 'example',
+          primaryColor: '#F59E0B',
+          secondaryColor: '#06B6D4',
+          logoUrl: 'https://placehold.co/200x80?text=株式会社エグザンプル',
+          contactEmail: 'mail@example.com',
+          postalCode: '150-0043',
+          phoneNumber: '03-5555-5555',
+          address: '東京都渋谷区道玄坂1-1-1',
+          status: 'inactive',
+          userCount: 5,
+          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+          contractEndDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          monthlyFee: 10000,
+          domesticSmsPrice: 3.5,
+          internationalSmsPrice: 12
+        },
+        {
+          id: 'tenant-4',
+          name: 'スタートアップ',
+          domain: 'startup.io',
+          subdomain: 'startup',
+          primaryColor: '#10B981',
+          secondaryColor: '#3B82F6',
+          logoUrl: 'https://placehold.co/200x80?text=スタートアップ',
+          contactEmail: 'hello@startup.io',
+          postalCode: '220-0012',
+          phoneNumber: '045-123-4567',
+          address: '神奈川県横浜市西区みなとみらい2-2-2',
+          status: 'pending',
+          userCount: 0,
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          contractEndDate: new Date(Date.now() + 355 * 24 * 60 * 60 * 1000).toISOString(),
+          monthlyFee: 2000,
+          domesticSmsPrice: 2.8,
+          internationalSmsPrice: 8
+        }
+      ];
+      
+      setTenants(mockData);
+      setFilteredTenants(mockData);
     } catch (error) {
+      console.error('テナントデータの取得に失敗しました', error);
       toast.error('テナントデータの取得に失敗しました');
-      console.error(error);
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // モックテナントデータ生成
-  const generateMockTenants = (): TenantData[] => {
-    return [
-      {
-        id: 'tenant-1',
-        name: 'サンプル株式会社',
-        domain: 'samplecompany.jp',
-        subdomain: 'sample',
-        primaryColor: '#3B82F6',
-        secondaryColor: '#10B981',
-        logoUrl: 'https://placehold.co/200x80?text=Sample+Inc',
-        contactEmail: 'admin@samplecompany.jp',
-        postalCode: '100-0001',
-        phoneNumber: '03-1234-5678',
-        address: '東京都千代田区千代田1-1-1',
-        status: 'active',
-        userCount: 25,
-        createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(),
-        contractEndDate: new Date(Date.now() + 185 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'tenant-2',
-        name: 'テストマーケティング',
-        domain: 'testmarketing.co.jp',
-        subdomain: 'testmkt',
-        primaryColor: '#EF4444',
-        secondaryColor: '#F59E0B',
-        logoUrl: 'https://placehold.co/200x80?text=Test+Marketing',
-        contactEmail: 'info@testmarketing.co.jp',
-        postalCode: '160-0022',
-        phoneNumber: '03-9876-5432',
-        address: '東京都新宿区新宿3-1-1',
-        status: 'active',
-        userCount: 12,
-        createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
-        contractEndDate: new Date(Date.now() + 275 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'tenant-3',
-        name: 'デジタルソリューションズ',
-        domain: 'digitalsolutions.jp',
-        subdomain: 'digsol',
-        primaryColor: '#8B5CF6',
-        secondaryColor: '#EC4899',
-        logoUrl: 'https://placehold.co/200x80?text=Digital+Solutions',
-        contactEmail: 'contact@digitalsolutions.jp',
-        postalCode: '220-0004',
-        phoneNumber: '045-123-4567',
-        address: '神奈川県横浜市西区北幸2-2-2',
-        status: 'inactive',
-        userCount: 5,
-        createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-        contractEndDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 'tenant-4',
-        name: 'クラウドテクノロジー',
-        domain: 'cloudtech.co.jp',
-        subdomain: 'cloudtech',
-        primaryColor: '#06B6D4',
-        secondaryColor: '#6366F1',
-        logoUrl: 'https://placehold.co/200x80?text=Cloud+Technology',
-        contactEmail: 'support@cloudtech.co.jp',
-        postalCode: '541-0053',
-        phoneNumber: '06-6123-7890',
-        address: '大阪府大阪市中央区本町1-1-1',
-        status: 'pending',
-        userCount: 0,
-        createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        contractEndDate: new Date(Date.now() + 355 * 24 * 60 * 60 * 1000).toISOString()
-      }
-    ];
   };
   
   // テナントフィルタリング
@@ -228,6 +246,9 @@ const TenantManagement: React.FC = () => {
       postalCode: '',
       phoneNumber: '',
       address: '',
+      monthlyFee: 0,
+      domesticSmsPrice: 3.3,
+      internationalSmsPrice: 10,
       status: 'active'
     });
     setValidationErrors({});
@@ -246,6 +267,9 @@ const TenantManagement: React.FC = () => {
       postalCode: tenant.postalCode,
       phoneNumber: tenant.phoneNumber,
       address: tenant.address,
+      monthlyFee: tenant.monthlyFee || 0,
+      domesticSmsPrice: tenant.domesticSmsPrice || 3.3,
+      internationalSmsPrice: tenant.internationalSmsPrice || 10,
       status: tenant.status
     });
     setValidationErrors({});
@@ -359,6 +383,9 @@ const TenantManagement: React.FC = () => {
           postalCode: formData.postalCode,
           phoneNumber: formData.phoneNumber,
           address: formData.address,
+          monthlyFee: formData.monthlyFee,
+          domesticSmsPrice: formData.domesticSmsPrice,
+          internationalSmsPrice: formData.internationalSmsPrice,
           status: formData.status
         };
         
@@ -380,6 +407,9 @@ const TenantManagement: React.FC = () => {
           postalCode: formData.postalCode,
           phoneNumber: formData.phoneNumber,
           address: formData.address,
+          monthlyFee: formData.monthlyFee,
+          domesticSmsPrice: formData.domesticSmsPrice,
+          internationalSmsPrice: formData.internationalSmsPrice,
           status: formData.status,
           userCount: 0,
           createdAt: new Date().toISOString(),
@@ -439,10 +469,21 @@ const TenantManagement: React.FC = () => {
     }
   };
   
+  // テナント詳細表示
   const handleViewTenant = (tenant: TenantData) => {
     setSelectedTenant(tenant);
   };
-  
+
+  // テナントのユーザー管理画面に遷移
+  const handleManageUsers = (tenant: TenantData) => {
+    // テナントコンテキストを設定
+    setTenantContext(tenant.id);
+    // ユーザー管理画面に遷移
+    navigate('/dashboard/tenant-users');
+    // モーダルを閉じる
+    setSelectedTenant(null);
+  };
+
   // テナント詳細表示コンポーネント
   const TenantDetailModal: React.FC<{ tenant: TenantData, onClose: () => void }> = ({ tenant, onClose }) => (
     <div className="fixed inset-0 bg-grey-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -458,123 +499,103 @@ const TenantManagement: React.FC = () => {
             </button>
           </div>
           
-          <div className="space-y-4">
-            <div className="bg-grey-50 p-4 rounded-lg mb-6 flex items-center justify-center">
-              {tenant.logoUrl ? (
-                <img src={tenant.logoUrl} alt={tenant.name} className="max-h-16" />
-              ) : (
-                <Building className="h-16 w-16 text-grey-400" />
-              )}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-grey-500">テナント名</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">テナント名</p>
                 <p className="font-medium">{tenant.name}</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">ステータス</p>
-                <p className="font-medium">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClass(tenant.status)}`}>
-                    {getStatusLabel(tenant.status)}
-                  </span>
-                </p>
+                <p className="text-sm font-medium text-grey-500 mb-1">ステータス</p>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadgeClass(tenant.status)}`}>
+                  {getStatusLabel(tenant.status)}
+                </span>
               </div>
               <div>
-                <p className="text-sm text-grey-500">ドメイン</p>
-                <p className="font-medium">{tenant.domain}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">連絡先メールアドレス</p>
+                <p>{tenant.contactEmail}</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">サブドメイン</p>
-                <p className="font-medium">{tenant.subdomain}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">ドメイン</p>
+                <p>{tenant.domain}</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">アクセスURL</p>
-                <p className="font-medium text-primary-600">
-                  https://{tenant.subdomain}.smsone.jp
-                </p>
+                <p className="text-sm font-medium text-grey-500 mb-1">郵便番号</p>
+                <p>{tenant.postalCode}</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">連絡先メールアドレス</p>
-                <p className="font-medium">{tenant.contactEmail}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">電話番号</p>
+                <p>{tenant.phoneNumber}</p>
+              </div>
+              <div className="md:col-span-2">
+                <p className="text-sm font-medium text-grey-500 mb-1">住所</p>
+                <p>{tenant.address}</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">郵便番号</p>
-                <p className="font-medium">{tenant.postalCode}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">月額基本料金</p>
+                <p>{Math.floor(tenant.monthlyFee || 0).toLocaleString()}円</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">電話番号</p>
-                <p className="font-medium">{tenant.phoneNumber}</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-sm text-grey-500">住所</p>
-                <p className="font-medium">{tenant.address}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">国内SMS送信単価</p>
+                <p>{Math.floor(tenant.domesticSmsPrice || 0).toLocaleString()}円</p>
               </div>
               <div>
-                <p className="text-sm text-grey-500">ユーザー数</p>
-                <p className="font-medium">{tenant.userCount}</p>
-              </div>
-              <div>
-                <p className="text-sm text-grey-500">契約終了日</p>
-                <p className="font-medium">{formatDate(tenant.contractEndDate)}</p>
+                <p className="text-sm font-medium text-grey-500 mb-1">海外SMS送信単価</p>
+                <p>{Math.floor(tenant.internationalSmsPrice || 0).toLocaleString()}円</p>
               </div>
             </div>
             
-            <div className="mt-6 space-y-3">
-              <h3 className="text-sm font-medium">ブランドカラー</h3>
-              <div className="flex space-x-4">
-                <div className="flex items-center">
-                  <div 
-                    className="w-8 h-8 rounded-md shadow-sm mr-2" 
-                    style={{ backgroundColor: tenant.primaryColor }}
-                  ></div>
-                  <div>
-                    <p className="text-xs text-grey-500">プライマリ</p>
-                    <p className="text-sm font-mono">{tenant.primaryColor}</p>
+            <div className="border-t pt-6">
+              <h4 className="text-sm font-medium mb-4">ブランドカラー</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm font-medium text-grey-500 mb-1">プライマリ</p>
+                  <div className="flex items-center">
+                    <div 
+                      className="w-8 h-8 rounded mr-2" 
+                      style={{ backgroundColor: tenant.primaryColor }}
+                    ></div>
+                    <span className="font-mono">{tenant.primaryColor}</span>
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <div 
-                    className="w-8 h-8 rounded-md shadow-sm mr-2" 
-                    style={{ backgroundColor: tenant.secondaryColor }}
-                  ></div>
-                  <div>
-                    <p className="text-xs text-grey-500">セカンダリ</p>
-                    <p className="text-sm font-mono">{tenant.secondaryColor}</p>
+                <div>
+                  <p className="text-sm font-medium text-grey-500 mb-1">セカンダリ</p>
+                  <div className="flex items-center">
+                    <div 
+                      className="w-8 h-8 rounded mr-2" 
+                      style={{ backgroundColor: tenant.secondaryColor }}
+                    ></div>
+                    <span className="font-mono">{tenant.secondaryColor}</span>
                   </div>
                 </div>
               </div>
             </div>
             
-            <div className="flex justify-end gap-2 pt-6 mt-6 border-t">
+            <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
               <button
-                className="btn-secondary text-sm"
+                className="btn-secondary"
+                onClick={onClose}
+              >
+                閉じる
+              </button>
+              
+              {/* ユーザー管理ボタンを追加 */}
+              <button
+                className="btn-primary flex items-center gap-2"
+                onClick={() => handleManageUsers(tenant)}
+              >
+                <Users className="h-4 w-4" />
+                利用者管理
+              </button>
+              
+              <button
+                className="btn-primary"
                 onClick={() => {
                   onClose();
                   handleEditTenant(tenant);
                 }}
               >
-                <Edit className="h-4 w-4 mr-1" />
                 編集
-              </button>
-              <button
-                className={`text-sm ${tenant.status === 'active' ? 'btn-error' : 'btn-success'}`}
-                onClick={() => {
-                  onClose();
-                  handleToggleStatus(tenant);
-                }}
-              >
-                {tenant.status === 'active' ? (
-                  <>
-                    <X className="h-4 w-4 mr-1" />
-                    無効化
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4 mr-1" />
-                    有効化
-                  </>
-                )}
               </button>
             </div>
           </div>
@@ -972,6 +993,48 @@ const TenantManagement: React.FC = () => {
                       <option value="inactive">無効</option>
                       <option value="pending">保留中</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
+                      月額基本料金（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="monthlyFee"
+                      value={formData.monthlyFee}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
+                      国内SMS送信単価（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="domesticSmsPrice"
+                      value={formData.domesticSmsPrice}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
+                      海外SMS送信単価（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="internationalSmsPrice"
+                      value={formData.internationalSmsPrice}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="0.1"
+                    />
                   </div>
                 </div>
                 

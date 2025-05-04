@@ -1,64 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Filter, Grid, List, HelpCircle, 
-  Mail, FileText, ExternalLink, ChevronLeft, ChevronRight
+  Mail, FileText, ExternalLink, ChevronLeft, ChevronRight,
+  BookOpen, Info, Smartphone, Send, FileQuestion, Shield
 } from 'lucide-react';
-
-type FAQItem = {
-  id: string;
-  question: string;
-  answer: string;
-  category: string;
-};
-
-const faqs: FAQItem[] = [
-  {
-    id: '1',
-    question: 'SMSの送信に失敗する場合はどうすればよいですか？',
-    answer: '送信エラーが発生した場合は、電話番号の形式が正しいか（国際形式の場合は国コードから始まるか）、送信可能な時間帯か（22:00～8:00は配信制限がある場合があります）、アカウントの残高が十分かを確認してください。エラーコードが表示されている場合は、そのコードをメールサポートにお知らせいただくとスムーズに対応できます。',
-    category: '送信',
-  },
-  {
-    id: '2',
-    question: 'CSVで一括送信する際の正しいフォーマットを教えてください',
-    answer: 'CSVファイルの1行目には必ずヘッダー（電話番号、メッセージ内容など）を入れてください。電話番号列は「phone」または「tel」、メッセージ内容列は「message」または「text」というヘッダー名を使用すると自動認識されます。電話番号は「09012345678」のようにハイフンなしの形式が推奨です。文字コードはUTF-8を使用してください。サンプルCSVは「送信履歴」画面からダウンロードできます。',
-    category: '送信',
-  },
-  {
-    id: '3',
-    question: 'Excelファイルで一括送信する方法を教えてください',
-    answer: 'Excel形式（.xlsx）の一括送信にも対応しています。CSVと同様に1行目にヘッダーを設定してください。「電話番号」「メッセージ」という列名が推奨されますが、英語の「phone」「message」なども自動認識されます。複数のシートがある場合は、最初のシート（Sheet1）のみが読み込まれます。日本語や絵文字を含む場合もExcel形式であれば文字化けの心配はありません。送信前には必ずプレビュー機能で内容を確認してください。',
-    category: '送信',
-  },
-  {
-    id: '4',
-    question: '送信予約したSMSをキャンセルする方法は？',
-    answer: '送信予約したSMSは「送信履歴」画面から確認できます。ステータスが「予約済」のメッセージを選択し、「予約キャンセル」ボタンをクリックすることでキャンセルできます。ただし、予約時刻の10分前を過ぎるとキャンセルできなくなりますのでご注意ください。',
-    category: '送信',
-  },
-  {
-    id: '5',
-    question: 'メッセージテンプレートで変数を使用する方法は？',
-    answer: 'メッセージテンプレートでは、「{{名前}}」のように二重波括弧で囲んだ文字を変数として使用できます。一括送信時にCSVの列名と変数名が一致すると、自動的に置換されます。例えば、CSVに「名前」という列があれば、メッセージ内の「{{名前}}」がその値に置き換わります。日時や番号などの書式設定も可能です。詳細はマニュアルをご参照ください。',
-    category: 'テンプレート',
-  },
-  {
-    id: '6',
-    question: '送信したSMSの配信状況を確認するには？',
-    answer: '送信したSMSの配信状況は「送信履歴」画面で確認できます。各メッセージには「送信済」「配信済」「不達」などのステータスが表示されます。詳細な配信レポートが必要な場合は、送信履歴の「レポート出力」ボタンからCSVまたはPDF形式でダウンロードできます。なお、キャリアからの配信状況の反映には数分から最大24時間かかる場合があります。',
-    category: '履歴',
-  },
-];
+import { FAQItem } from '../../types';
+import useFAQStore from '../../store/faqStore';
+import useAuthStore from '../../store/authStore';
+import { Link } from 'react-router-dom';
 
 const HelpSupportContent: React.FC = () => {
+  const { faqs, isLoading, error, fetchFAQs, getAllCategories } = useFAQStore();
+  const { hasPermission } = useAuthStore();
+  const isSystemAdmin = useAuthStore(state => state.user?.role === 'SYSTEM_ADMIN');
+  
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredFAQs, setFilteredFAQs] = useState<FAQItem[]>(faqs);
+  const [filteredFAQs, setFilteredFAQs] = useState<FAQItem[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(6);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
+  // 初期データ取得
+  useEffect(() => {
+    fetchFAQs();
+  }, [fetchFAQs]);
+  
+  // 絞り込み
   useEffect(() => {
     let result = [...faqs];
     
@@ -76,7 +45,7 @@ const HelpSupportContent: React.FC = () => {
     
     setFilteredFAQs(result);
     setCurrentPage(1); // 検索条件変更時はページを1に戻す
-  }, [searchTerm, categoryFilter]);
+  }, [faqs, searchTerm, categoryFilter]);
   
   const totalPages = Math.max(1, Math.ceil(filteredFAQs.length / itemsPerPage));
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -84,13 +53,28 @@ const HelpSupportContent: React.FC = () => {
   const currentItems = filteredFAQs.slice(indexOfFirstItem, indexOfLastItem);
   
   // カテゴリーの一覧を取得
-  const categories = ['all', ...Array.from(new Set(faqs.map(faq => faq.category)))];
+  const categories = ['all', ...getAllCategories()];
+  
+  if (isLoading) {
+    return (
+      <div className="text-center py-10">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-grey-300 border-t-primary-600"></div>
+        <p className="mt-2 text-grey-500">データを読み込み中...</p>
+      </div>
+    );
+  }
   
   return (
     <>
       <div className="p-4 border-b border-grey-200">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-medium text-grey-900">よくある質問</h2>
+          
+          {isSystemAdmin && (
+            <Link to="/dashboard/faq-management" className="btn-secondary text-sm">
+              FAQ管理
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
@@ -252,22 +236,6 @@ const HelpSupportContent: React.FC = () => {
               </div>
             </div>
           </div>
-          
-          <a 
-            href="https://topaz.jp/smsone/docs" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-start p-4 bg-white rounded-lg border border-grey-200 shadow-sm hover:shadow transition-shadow"
-          >
-            <FileText className="w-5 h-5 text-primary-600 mr-3 flex-shrink-0" />
-            <div className="flex-1">
-              <h4 className="font-medium text-grey-900">マニュアル・ガイド</h4>
-              <p className="text-grey-600 text-sm mt-1">
-                SMSOneの詳細な使用方法や機能説明
-              </p>
-            </div>
-            <ExternalLink className="w-4 h-4 text-grey-400" />
-          </a>
         </div>
       </div>
     </>

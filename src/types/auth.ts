@@ -1,4 +1,5 @@
-import { User, Tenant } from './index';
+// import { User, Tenant } from './index';
+import { BankInfo } from './invoice';
 
 export interface AuthState {
   user: User | null;
@@ -6,6 +7,7 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  tenantContext: { tenantId: string, tenantName: string } | null;
 }
 
 export interface User {
@@ -17,6 +19,13 @@ export interface User {
   createdAt: string;
   lastLogin: string;
   isActive: boolean;
+  companyName?: string;
+  postalCode?: string;
+  address?: string;
+  phoneNumber?: string;
+  contactEmail?: string;
+  sealImage?: string; // 印鑑画像データのBase64文字列
+  bankInfo?: BankInfo; // 振込先情報
   permissions: {
     internationalSms: boolean;
     templateEditing: boolean;

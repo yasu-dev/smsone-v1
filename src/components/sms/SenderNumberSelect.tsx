@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Info, Globe } from 'lucide-react';
 import useSenderNumberStore from '../../store/senderNumberStore';
@@ -8,12 +7,14 @@ interface SenderNumberSelectProps {
   onChange: (senderNumber: string) => void;
   initialSenderNumber?: string;
   disabled?: boolean;
+  onSenderTypeChange?: (isInternational: boolean) => void; // 国内/海外送信切替通知用
 }
 
 const SenderNumberSelect: React.FC<SenderNumberSelectProps> = ({
   onChange,
   initialSenderNumber,
-  disabled = false
+  disabled = false,
+  onSenderTypeChange
 }) => {
   const { 
     fetchSenderNumbers, 
@@ -38,17 +39,32 @@ const SenderNumberSelect: React.FC<SenderNumberSelectProps> = ({
         const defaultNumber = availableNumbers[0].number;
         setSenderNumber(defaultNumber);
         onChange(defaultNumber);
+        
+        // 初期値の送信タイプを親コンポーネントに通知
+        const isInitialInternational = availableNumbers.find(sn => sn.number === defaultNumber)?.isInternational || false;
+        if (onSenderTypeChange) {
+          onSenderTypeChange(isInitialInternational);
+        }
       }
     }
-  }, [getAvailableSenderNumbers, initialSenderNumber, senderNumber, onChange, user?.id]);
+  }, [getAvailableSenderNumbers, initialSenderNumber, senderNumber, onChange, user?.id, onSenderTypeChange]);
   
   // 利用可能な送信元番号一覧（現在のユーザーに基づくフィルタリング）
   const availableSenderNumbers = getAvailableSenderNumbers(user?.id);
   
   // 送信元番号選択変更ハンドラ
   const handleSenderNumberChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSenderNumber(e.target.value);
-    onChange(e.target.value);
+    const selectedValue = e.target.value;
+    setSenderNumber(selectedValue);
+    onChange(selectedValue);
+    
+    // 選択された送信者名の種類を親コンポーネントに通知
+    if (onSenderTypeChange) {
+      const selectedSenderNumber = availableSenderNumbers.find(sn => sn.number === selectedValue);
+      if (selectedSenderNumber) {
+        onSenderTypeChange(selectedSenderNumber.isInternational || false);
+      }
+    }
   };
 
   return (
@@ -83,9 +99,9 @@ const SenderNumberSelect: React.FC<SenderNumberSelectProps> = ({
                 </optgroup>
               )}
               
-              {/* 国際送信対応の送信者名グループ */}
+              {/* 海外送信対応の送信者名グループ */}
               {availableSenderNumbers.some(sn => sn.isInternational) && (
-                <optgroup label="国際送信対応の送信者名">
+                <optgroup label="海外送信対応の送信者名">
                   {availableSenderNumbers
                     .filter(sn => sn.isInternational)
                     .map((sn) => (
@@ -109,7 +125,7 @@ const SenderNumberSelect: React.FC<SenderNumberSelectProps> = ({
             {availableSenderNumbers.some(sn => sn.isInternational) && (
               <span className="flex items-center mt-1">
                 <Globe className="h-4 w-4 mr-1 text-primary-500" />
-                <span className="text-primary-600">国際送信対応</span>の送信者名は国際宛先への送信に使用できます。
+                <span className="text-primary-600">海外送信対応</span>の送信者名は海外宛先への送信に使用できます。
               </span>
             )}
           </p>

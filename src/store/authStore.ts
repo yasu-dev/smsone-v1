@@ -228,6 +228,8 @@ interface AuthStore extends AuthState {
   updateUser: (updatedUser: User) => void;
   getTenantInfo: () => Tenant;
   updateTenant: (updatedTenant: Tenant) => void;
+  setTenantContext: (tenantId: string) => void;
+  clearTenantContext: () => void;
 }
 
 const useAuthStore = create<AuthStore>((set, get) => ({
@@ -236,6 +238,7 @@ const useAuthStore = create<AuthStore>((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   error: null,
+  tenantContext: null as { tenantId: string, tenantName: string } | null,
 
   login: async (username: string, password: string) => {
     set({ isLoading: true, error: null });
@@ -382,29 +385,60 @@ const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
+  setTenantContext: (tenantId: string) => {
+    const tenant = mockTenants[tenantId];
+    if (tenant) {
+      set({ 
+        tenantContext: { 
+          tenantId: tenant.id, 
+          tenantName: tenant.name 
+        }
+      });
+    }
+  },
+
+  clearTenantContext: () => {
+    set({ tenantContext: null });
+  },
+
   hasPermission: (permission: string) => {
-    const { user } = get();
+    const { user, tenantContext } = get();
     
     if (!user) return false;
     
-    const userRole = user.role;
-    
-    if (userRole === 'SYSTEM_ADMIN') return true;
+    if (user.role === 'SYSTEM_ADMIN') {
+      if (tenantContext) {
+        if (permission === 'tenantSettings' || 
+            permission === 'userManagement' || 
+            permission === 'billingAccess' || 
+            permission === 'surveysCreation') {
+          return true;
+        }
+        
+        const tenantAdminUser = Object.values(mockUsers).find(u => 
+          u.role === 'TENANT_ADMIN' && u.tenant_id === tenantContext.tenantId
+        );
+        
+        return tenantAdminUser?.permissions ? !!tenantAdminUser.permissions[permission] : false;
+      }
+      
+      return true;
+    }
     
     if (permission === 'tenantSettings') {
-      return userRole === 'TENANT_ADMIN';
+      return user.role === 'TENANT_ADMIN';
     }
     
     if (permission === 'userManagement') {
-      return userRole === 'TENANT_ADMIN';
+      return user.role === 'TENANT_ADMIN';
     }
     
     if (permission === 'billingAccess') {
-      return userRole === 'TENANT_ADMIN' || userRole === 'OPERATION_ADMIN';
+      return user.role === 'TENANT_ADMIN' || user.role === 'OPERATION_ADMIN';
     }
     
     if (permission === 'surveysCreation') {
-      return userRole === 'TENANT_ADMIN' || userRole === 'OPERATION_ADMIN';
+      return user.role === 'TENANT_ADMIN' || user.role === 'OPERATION_ADMIN';
     }
     
     return user.permissions ? !!user.permissions[permission] : false;

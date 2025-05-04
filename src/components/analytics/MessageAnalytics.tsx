@@ -474,7 +474,7 @@ export const MessageAnalytics: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6 p-4 rounded-lg">
         <div className="space-y-1">
-          <h2 className="text-xl font-semibold text-grey-900">メッセージ分析</h2>
+          <h2 className="text-lg font-medium text-grey-900">メッセージ分析</h2>
           <p className="text-sm text-gray-500">送信したSMSの配信状況やステータスを分析できます</p>
         </div>
         <div className="flex items-center space-x-4">

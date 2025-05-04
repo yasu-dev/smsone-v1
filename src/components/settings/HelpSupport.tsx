@@ -90,27 +90,6 @@ const HelpSupport: React.FC = () => {
           </div>
         </div>
       </div>
-
-      <div className="mt-6">
-        <h3 className="text-lg font-medium mb-3">リソース</h3>
-        <div className="grid grid-cols-1 gap-4">
-          <a 
-            href="https://topaz.jp/smsone/docs" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center p-4 bg-white rounded-lg border border-grey-200 hover:bg-grey-50 transition-colors"
-          >
-            <FileText className="w-5 h-5 text-primary-600 mr-3" />
-            <div>
-              <h4 className="font-medium text-grey-900">マニュアル・ガイド</h4>
-              <p className="text-grey-600 text-sm mt-1">
-                SMSOneの詳細な使用方法や機能説明
-              </p>
-            </div>
-            <ExternalLink className="w-4 h-4 text-grey-400 ml-auto" />
-          </a>
-        </div>
-      </div>
     </div>
   );
 };

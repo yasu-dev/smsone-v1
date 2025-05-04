@@ -1,17 +1,35 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { InvoiceDetails } from './UserBillingDetails';
+import { Font } from '@react-pdf/renderer';
+
+Font.register({
+  family: 'NotoSansJP',
+  fonts: [
+    {
+      // Regular font loaded as ArrayBuffer to avoid unknown format error
+      src: () => fetch('/fonts/NotoSansJP-Regular.ttf').then(res => res.arrayBuffer()),
+      fontWeight: 'normal'
+    },
+    {
+      src: () => fetch('/fonts/NotoSansJP-Bold.ttf').then(res => res.arrayBuffer()),
+      fontWeight: 'bold'
+    }
+  ]
+});
 
 const styles = StyleSheet.create({
   page: {
     padding: 40,
     fontSize: 10,
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    fontFamily: 'NotoSansJP'
   },
   title: {
     fontSize: 24,
     textAlign: 'center',
-    marginBottom: 20
+    marginBottom: 20,
+    fontFamily: 'NotoSansJP'
   },
   header: {
     flexDirection: 'row',

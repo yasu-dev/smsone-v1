@@ -43,10 +43,36 @@ const Surveys: React.FC = () => {
     
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      result = result.filter(survey => 
-        survey.title.toLowerCase().includes(lowerSearchTerm) ||
-        survey.description.toLowerCase().includes(lowerSearchTerm)
-      );
+      result = result.filter(survey => {
+        // タイトルと説明で検索
+        if (survey.title?.toLowerCase().includes(lowerSearchTerm)) return true;
+        if (survey.description?.toLowerCase().includes(lowerSearchTerm)) return true;
+        
+        // アンケートの質問文とその選択肢も検索対象に含める
+        if (survey.questions && Array.isArray(survey.questions)) {
+          // いずれかの質問またはその選択肢に該当するキーワードが含まれていたらtrue
+          return survey.questions.some(question => {
+            // TypeScriptの型定義と実際のオブジェクト構造が異なるため型アサーションを使用
+            const q = question as any;
+            
+            // 質問文に検索ワードが含まれている場合
+            if (q.questionText?.toLowerCase().includes(lowerSearchTerm)) {
+              return true;
+            }
+            
+            // 選択肢に検索ワードが含まれている場合
+            if (q.options && Array.isArray(q.options)) {
+              return q.options.some((option: any) => 
+                option.optionText?.toLowerCase().includes(lowerSearchTerm)
+              );
+            }
+            
+            return false;
+          });
+        }
+        
+        return false;
+      });
     }
     
     setFilteredSurveys(result);
@@ -135,7 +161,7 @@ const Surveys: React.FC = () => {
               </div>
               <input
                 type="search"
-                placeholder="アンケート名、説明文で検索..."
+                placeholder="アンケートを検索..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="form-input pl-10 w-full"
@@ -218,6 +244,19 @@ const Surveys: React.FC = () => {
                   ? '検索条件に一致するアンケートが見つかりませんでした。'
                   : 'アンケートが存在しません。'}
               </p>
+              {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all') && (
+                <button
+                  type="button"
+                  className="mt-4 btn-secondary"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('all');
+                    setTypeFilter('all');
+                  }}
+                >
+                  検索条件をクリア
+                </button>
+              )}
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Download, Calendar, ClipboardList, BarChart2, CheckCircle, Activity, Smile, Package, Users, TrendingUp, Repeat, Star, ThumbsUp, Heart, UserCheck, Eye, ExternalLink, LayoutGrid, List } from 'lucide-react';
 import { ResponsiveContainer, LineChart, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, PieChart as RechartPieChart, Pie, Cell, Line } from 'recharts';
 import { Dialog, Transition } from '@headlessui/react';
@@ -15,7 +15,7 @@ interface Survey {
   responseCount: number;
   completionRate: number;
   isActive: boolean;
-  type?: string;
+  type?: SurveyType;
   url?: string;
 }
 
@@ -155,6 +155,25 @@ const SurveyAnalytics: React.FC = () => {
   const [exportPeriod, setExportPeriod] = useState<'today' | '7days' | '14days' | '30days' | '90days' | 'custom'>('30days');
   const navigate = useNavigate();
   
+  // コンポーネントがマウントされたときに初期化
+  useEffect(() => {
+    // 初期化処理
+    
+    // クリーンアップ関数
+    return () => {
+      setSelectedSurveyId(null);
+      setSelectedSurvey(null);
+      setSurveyQuestions([]);
+      setTimeSeriesData([]);
+    };
+  }, []);
+  
+  // モーダルを閉じる共通関数
+  const closeModal = () => {
+    setSelectedSurveyId(null);
+    setSelectedSurvey(null);
+  };
+  
   // モックデータ作成（より充実したデータを生成）
   const surveys: Survey[] = React.useMemo(() => {
     return [
@@ -262,17 +281,100 @@ const SurveyAnalytics: React.FC = () => {
   
   // アンケート選択時の処理を修正
   const handleSurveySelect = (surveyId: string) => {
-    setSelectedSurveyId(surveyId);
-    const survey = surveys.find(s => s.id === surveyId);
-    if (survey) {
-      setSelectedSurvey(survey);
-      // アンケートの質問データを取得
-      const questions = surveyQuestions.filter(q => q.surveyId === surveyId);
-      setSurveyQuestions(questions);
-      // 時系列データを取得
-      const timeData = timeSeriesData.filter(d => d.surveyId === surveyId);
-      setTimeSeriesData(timeData);
+    // 同じアンケートが選択された場合はモーダルを閉じる
+    if (selectedSurveyId === surveyId) {
+      closeModal();
+      return;
     }
+    
+    // まず状態をリセット
+    setSelectedSurveyId(null);
+    setSelectedSurvey(null);
+    setSurveyQuestions([]);
+    setTimeSeriesData([]);
+    
+    // 少し遅らせて新しい状態をセット（レンダリングサイクルを分離）
+    setTimeout(() => {
+      const foundSurvey = surveys.find(s => s.id === surveyId);
+      if (foundSurvey) {
+        setSelectedSurveyId(surveyId);
+        setSelectedSurvey(foundSurvey);
+        
+        // モックデータ: アンケートの質問とそれに対する回答データを生成
+        const mockQuestions: SurveyQuestion[] = [
+          {
+            id: `${foundSurvey.id}-q1`,
+            surveyId: foundSurvey.id,
+            question: foundSurvey.title.includes('満足度') 
+              ? '当社のサービスにどの程度満足していますか？' 
+              : '商品・サービスの品質にどの程度満足していますか？',
+            type: 'single',
+            options: ['非常に満足', '満足', 'どちらでもない', '不満', '非常に不満'],
+            responses: [
+              { option: '非常に満足', count: Math.floor(Math.random() * 30) + 20 },
+              { option: '満足', count: Math.floor(Math.random() * 40) + 30 },
+              { option: 'どちらでもない', count: Math.floor(Math.random() * 20) + 10 },
+              { option: '不満', count: Math.floor(Math.random() * 15) + 5 },
+              { option: '非常に不満', count: Math.floor(Math.random() * 10) + 1 }
+            ]
+          },
+          {
+            id: `${foundSurvey.id}-q2`,
+            surveyId: foundSurvey.id,
+            question: '最も価値を感じた機能は何ですか？',
+            type: 'multiple',
+            options: ['SMS送信', '短縮URL', 'アンケート作成', '顧客管理', '分析機能'],
+            responses: [
+              { option: 'SMS送信', count: Math.floor(Math.random() * 50) + 30 },
+              { option: '短縮URL', count: Math.floor(Math.random() * 40) + 20 },
+              { option: 'アンケート作成', count: Math.floor(Math.random() * 30) + 15 },
+              { option: '顧客管理', count: Math.floor(Math.random() * 35) + 25 },
+              { option: '分析機能', count: Math.floor(Math.random() * 25) + 10 }
+            ]
+          },
+          {
+            id: `${foundSurvey.id}-q3`,
+            surveyId: foundSurvey.id,
+            question: '当社のサービスの総合評価を5段階でお答えください',
+            type: 'rating',
+            responses: [
+              { rating: '1', count: Math.floor(Math.random() * 5) + 1 },
+              { rating: '2', count: Math.floor(Math.random() * 10) + 3 },
+              { rating: '3', count: Math.floor(Math.random() * 20) + 10 },
+              { rating: '4', count: Math.floor(Math.random() * 30) + 25 },
+              { rating: '5', count: Math.floor(Math.random() * 25) + 15 }
+            ]
+          },
+          {
+            id: `${foundSurvey.id}-q4`,
+            surveyId: foundSurvey.id,
+            question: '改善点やご要望があればお聞かせください',
+            type: 'text',
+            responses: [
+              '使いやすいサービスですが、もう少し分析機能が充実するとよいと思います。',
+              'SMSの送信速度がもう少し速くなるとありがたいです。',
+              '全体的に満足していますが、UIがもう少し洗練されるとよいかもしれません。',
+              'アンケート機能が非常に便利です。今後も期待しています。',
+              '顧客データのインポート機能がもっと柔軟になるとよいです。'
+            ]
+          }
+        ];
+        setSurveyQuestions(mockQuestions);
+        
+        // 時系列データを生成
+        const now = new Date();
+        const mockTimeData: TimeSeriesData[] = Array.from({ length: 30 }, (_, i) => {
+          const date = new Date(now);
+          date.setDate(date.getDate() - (29 - i));
+          return {
+            surveyId: foundSurvey.id,
+            date: date.toISOString().split('T')[0],
+            count: Math.floor(Math.random() * 15) + (i < 5 ? 1 : (i < 15 ? 5 : 10))
+          };
+        });
+        setTimeSeriesData(mockTimeData);
+      }
+    }, 0);
   };
 
   // エクスポート処理を修正
@@ -331,18 +433,51 @@ const SurveyAnalytics: React.FC = () => {
     navigate(`/dashboard/analytics/url/${encodeURIComponent(survey.url)}`);
   };
 
-  const SurveyDetails = ({ survey, questions, demographicData, timeSeriesData, onClose }: any) => {
+  // サーベイ詳細モーダルの型定義
+  interface SurveyDetailsProps {
+    survey: Survey;
+    questions: SurveyQuestion[];
+    timeSeriesData: TimeSeriesData[];
+    onClose: () => void;
+  }
+
+  // 詳細モーダルコンポーネント
+  const SurveyDetails: React.FC<SurveyDetailsProps> = ({ survey, questions, timeSeriesData, onClose }) => {
     if (!survey) return null;
     
-    // アンケートタイプの判定（実際のアプリケーションではsurvey.typeから取得）
+    // アンケートタイプの判定
     const surveyType: SurveyType = survey.type || 'general';
     const colors = surveyTypeColors[surveyType];
     const icon = surveyTypeIcons[surveyType];
     const additionalMetrics = getAdditionalMetrics(surveyType, survey);
     
+    // デモグラフィックデータを生成
+    const demographicData = {
+      genderData: [
+        { gender: '男性', count: Math.floor(survey.responseCount * 0.55) },
+        { gender: '女性', count: Math.floor(survey.responseCount * 0.43) },
+        { gender: 'その他', count: Math.floor(survey.responseCount * 0.02) }
+      ],
+      ageGroups: [
+        { group: '10代以下', count: Math.floor(survey.responseCount * 0.05) },
+        { group: '20代', count: Math.floor(survey.responseCount * 0.25) },
+        { group: '30代', count: Math.floor(survey.responseCount * 0.30) },
+        { group: '40代', count: Math.floor(survey.responseCount * 0.20) },
+        { group: '50代', count: Math.floor(survey.responseCount * 0.15) },
+        { group: '60代以上', count: Math.floor(survey.responseCount * 0.05) }
+      ]
+    };
+
+    // モーダルが閉じるときのハンドラ
+    const handleCloseModal = () => {
+      if (onClose) {
+        onClose();
+      }
+    };
+    
     return (
-      <Transition appear show={true} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Transition appear show={!!survey} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={handleCloseModal}>
           <Transition.Child
             as={Fragment}
             enter="ease-out duration-300"
@@ -366,7 +501,10 @@ const SurveyAnalytics: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all">
+                <Dialog.Panel
+                  onClick={(e) => e.stopPropagation()} 
+                  className="w-full max-w-6xl transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all"
+                >
                   <div className="flex justify-between items-center mb-6">
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
@@ -395,7 +533,11 @@ const SurveyAnalytics: React.FC = () => {
                       <button
                         type="button"
                         className="rounded-md p-2 text-gray-400 hover:text-gray-500 focus:outline-none"
-                        onClick={onClose}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleCloseModal();
+                        }}
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -511,66 +653,73 @@ const SurveyAnalytics: React.FC = () => {
                       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">質問と回答</h3>
                         <div className="space-y-6">
-                          {questions.map((question: SurveyQuestion) => (
-                            <div key={question.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                              <h4 className="font-medium text-gray-900 mb-4">{question.question}</h4>
-                              
-                              {question.type === 'rating' && (
-                                <div className="h-64">
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={question.responses}>
-                                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                                      <XAxis dataKey="rating" stroke="#6B7280" />
-                                      <YAxis stroke="#6B7280" />
-                                      <Tooltip 
-                                        contentStyle={{ 
-                                          backgroundColor: 'white',
-                                          border: '1px solid #E5E7EB',
-                                          borderRadius: '0.5rem'
-                                        }}
-                                      />
-                                      <Bar dataKey="count" fill={colors.accent} radius={[4, 4, 0, 0]} />
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              )}
-                              
-                              {(question.type === 'single' || question.type === 'multiple') && (
-                                <div className="h-64">
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={question.responses} layout="vertical">
-                                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                                      <XAxis type="number" stroke="#6B7280" />
-                                      <YAxis 
-                                        dataKey="option" 
-                                        type="category" 
-                                        width={150} 
-                                        stroke="#6B7280"
-                                      />
-                                      <Tooltip 
-                                        contentStyle={{ 
-                                          backgroundColor: 'white',
-                                          border: '1px solid #E5E7EB',
-                                          borderRadius: '0.5rem'
-                                        }}
-                                      />
-                                      <Bar dataKey="count" fill={colors.accent} radius={[0, 0, 4, 4]} />
-                                    </BarChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              )}
-                              
-                              {question.type === 'text' && (
-                                <div className="max-h-64 overflow-y-auto space-y-2">
-                                  {question.responses.map((response, i) => (
-                                    <div key={i} className="p-3 bg-gray-50 rounded-lg text-sm border border-gray-100">
-                                      {response}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                          {questions && questions.length > 0 ? (
+                            questions.map((question: SurveyQuestion) => (
+                              <div key={question.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                <h4 className="font-medium text-gray-900 mb-4">{question.question}</h4>
+                                
+                                {question.type === 'rating' && (
+                                  <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <BarChart data={question.responses}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                        <XAxis dataKey="rating" stroke="#6B7280" />
+                                        <YAxis stroke="#6B7280" />
+                                        <Tooltip 
+                                          contentStyle={{ 
+                                            backgroundColor: 'white',
+                                            border: '1px solid #E5E7EB',
+                                            borderRadius: '0.5rem'
+                                          }}
+                                        />
+                                        <Bar dataKey="count" fill={colors.accent} radius={[4, 4, 0, 0]} />
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                )}
+                                
+                                {(question.type === 'single' || question.type === 'multiple') && (
+                                  <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                      <BarChart data={question.responses} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                        <XAxis type="number" stroke="#6B7280" />
+                                        <YAxis 
+                                          dataKey="option" 
+                                          type="category" 
+                                          width={150} 
+                                          stroke="#6B7280"
+                                        />
+                                        <Tooltip 
+                                          contentStyle={{ 
+                                            backgroundColor: 'white',
+                                            border: '1px solid #E5E7EB',
+                                            borderRadius: '0.5rem'
+                                          }}
+                                        />
+                                        <Bar dataKey="count" fill={colors.accent} radius={[0, 0, 4, 4]} />
+                                      </BarChart>
+                                    </ResponsiveContainer>
+                                  </div>
+                                )}
+                                
+                                {question.type === 'text' && (
+                                  <div className="max-h-64 overflow-y-auto space-y-2">
+                                    {question.responses.map((response, i) => (
+                                      <div key={i} className="p-3 bg-gray-50 rounded-lg text-sm border border-gray-100">
+                                        {response}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-8">
+                              <p className="text-gray-500">このアンケートの質問データがありません。</p>
+                              <p className="text-sm text-gray-400 mt-2">または、データの読み込み中です...</p>
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     </div>
@@ -650,17 +799,6 @@ const SurveyAnalytics: React.FC = () => {
               >
                 <div className="flex flex-col h-full">
                   <div className="flex-1">
-                    <div className="flex justify-end mb-2">
-                      <button
-                        className="p-1 text-grey-500 hover:text-grey-700"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUrlAnalytics(survey);
-                        }}
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </button>
-                    </div>
                     <h3 className="text-sm font-medium text-grey-900 line-clamp-2">
                       {survey.title}
                     </h3>
@@ -711,8 +849,7 @@ const SurveyAnalytics: React.FC = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div 
-                        className="text-sm text-grey-900 hover:text-primary-600 cursor-pointer"
-                        onClick={() => handleUrlAnalytics(survey)}
+                        className="text-sm text-grey-900"
                       >
                         {survey.title}
                       </div>
@@ -746,7 +883,7 @@ const SurveyAnalytics: React.FC = () => {
           survey={selectedSurvey} 
           questions={surveyQuestions} 
           timeSeriesData={timeSeriesData}
-          onClose={() => setSelectedSurveyId(null)}
+          onClose={closeModal}
         />
       )}
     </div>

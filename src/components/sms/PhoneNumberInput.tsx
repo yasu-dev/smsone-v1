@@ -36,9 +36,9 @@ const PhoneNumberInput: React.FC<PhoneNumberInputProps> = ({
         case 'domestic':
           return '例: 09012345678(国内)';
         case 'international':
-          return '例: +819012345678(国際)';
+          return '例: +819012345678(海外)';
         case 'both':
-          return '例: 09012345678(国内)、+819012345678(国際)';
+          return '例: 09012345678(国内)、+819012345678(海外)';
         default:
           return '例: 09012345678';
       }

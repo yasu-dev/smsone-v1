@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Plus, Edit, Trash2, RefreshCw, Shield, Clock, Calendar, Info, Activity, Check, X, Download, FileText, MessageSquare, MoreVertical, Users, Grid, List } from 'lucide-react';
+import { User, Search, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Plus, Edit, Trash2, RefreshCw, Shield, Clock, Calendar, Info, Activity, Check, X, Download, FileText, MessageSquare, MoreVertical, Users, Grid, List, ArrowLeft, Phone, Globe } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import MessagingSettings from '../components/settings/MessagingSettings';
 import { UserRole } from '../types/tenant'; // インポート元を修正
+import useAuthStore from '../store/authStore';
+import useSenderNumberStore from '../store/senderNumberStore';
+import { SenderNumber } from '../types';
 
 interface UserData {
   id: string;
   username: string;
   email: string;
   role: UserRole;
+  tenant_id: string; // テナントID
   status: 'active' | 'inactive' | 'pending';
   lastLoginAt: string;
   createdAt: string;
@@ -18,6 +22,9 @@ interface UserData {
   postalCode: string; // 郵便番号を追加
   phoneNumber: string; // 電話番号を追加
   address: string; // 住所を追加
+  monthlyFee?: number; // 月額基本料金
+  domesticSmsPrice?: number; // 国内SMS送信単価
+  internationalSmsPrice?: number; // 海外SMS送信単価
   permissions: {
     internationalSms: boolean;
     templateEditing: boolean;
@@ -55,8 +62,8 @@ interface UserContractData {
 const roleDisplayNames: Record<UserRole, string> = {
   [UserRole.SYSTEM_ADMIN]: 'システム管理者 (Topaz合同会社のSMSOne)',
   [UserRole.TENANT_ADMIN]: 'テナント管理者 (サンプル株式会社のSMSService)',
-  [UserRole.OPERATION_ADMIN]: 'サービス利用者',
-  [UserRole.OPERATION_USER]: 'サービス利用者'
+  [UserRole.OPERATION_ADMIN]: '利用者',
+  [UserRole.OPERATION_USER]: '利用者'
 };
 
 // MessagingSettingsコンポーネントのProps型を定義
@@ -69,14 +76,14 @@ const UserMessagingSettings: React.FC<MessagingSettingsProps> = ({ userId }) => 
   // 仮の実装 - 実際のコンポーネントに置き換える
   return (
     <div>
-      <p>ユーザーID: {userId || '未指定'}</p>
+      <p>利用者ID: {userId || '未指定'}</p>
       {/* 実際の送信者名設定コンポーネントの内容を表示 */}
     </div>
   );
 };
 
 const UserManagement: React.FC = () => {
-  // ユーザーリスト状態
+  // 利用者リスト状態
   const [users, setUsers] = useState<UserData[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserData[]>([]);
   const [activityLogs, setActivityLogs] = useState<UserActivityData[]>([]);
@@ -98,9 +105,15 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid'); // デフォルト表示をグリッドに変更
   
-  // ユーザー編集用フォーム状態
+  // 認証情報を取得
+  const { user, tenantContext, clearTenantContext } = useAuthStore();
+  
+  // 送信者名情報を取得
+  const { senderNumbers, loadSenderNumbers } = useSenderNumberStore();
+  
+  // 利用者編集用フォーム状態
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -109,6 +122,9 @@ const UserManagement: React.FC = () => {
     postalCode: '', // 郵便番号
     phoneNumber: '', // 電話番号
     address: '', // 住所
+    monthlyFee: 0, // 月額基本料金
+    domesticSmsPrice: 3.3, // 国内SMS送信単価（デフォルト値）
+    internationalSmsPrice: 10, // 海外SMS送信単価（デフォルト値）
     permissions: {
       internationalSms: false,
       templateEditing: false,
@@ -131,6 +147,9 @@ const UserManagement: React.FC = () => {
     postalCode: '',
     phoneNumber: '',
     address: '',
+    monthlyFee: 0,
+    domesticSmsPrice: 3.3,
+    internationalSmsPrice: 10,
     permissions: {
       internationalSms: false,
       templateEditing: false,
@@ -154,17 +173,30 @@ const UserManagement: React.FC = () => {
   const [showMessageSettings, setShowMessageSettings] = useState(false);
   const [selectedUserForSettings, setSelectedUserForSettings] = useState<UserData | null>(null);
   
+  // 送信者名入力用のステート
+  const [domesticSenderNumberInput, setDomesticSenderNumberInput] = useState('');
+  const [domesticSenderDescriptionInput, setDomesticSenderDescriptionInput] = useState('');
+  const [internationalSenderNumberInput, setInternationalSenderNumberInput] = useState('');
+  const [internationalSenderDescriptionInput, setInternationalSenderDescriptionInput] = useState('');
+  
   // 初回データ取得
   useEffect(() => {
     fetchUsers();
-  }, []);
+    loadSenderNumbers();
+  }, [loadSenderNumbers]);
+  
+  // コンテキスト終了処理
+  const handleExitTenantContext = () => {
+    clearTenantContext();
+    navigate('/dashboard/system/tenants');
+  };
   
   // 検索条件変更時のフィルタリング
   useEffect(() => {
     filterUsers();
   }, [searchTerm, users, sortField, sortDirection, roleFilter, statusFilter]);
   
-  // ユーザーデータ取得
+  // 利用者データ取得
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
@@ -180,14 +212,14 @@ const UserManagement: React.FC = () => {
       setContracts(mockContracts);
       setFilteredUsers(mockUsers);
     } catch (error) {
-      toast.error('ユーザーデータの取得に失敗しました');
+      toast.error('利用者データの取得に失敗しました');
       console.error(error);
     } finally {
       setIsLoading(false);
     }
   };
   
-  // モックユーザーデータ生成
+  // モック利用者データ生成
   const generateMockUsers = (): UserData[] => {
     return [
       // システム管理者
@@ -197,6 +229,7 @@ const UserManagement: React.FC = () => {
         email: 'admin@system.com',
         role: UserRole.SYSTEM_ADMIN,
         status: 'active',
+        tenant_id: 'smsone', // システム管理者のテナントID
         lastLoginAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
         company: 'Topaz合同会社',
@@ -221,6 +254,7 @@ const UserManagement: React.FC = () => {
         email: 'admin@sampleoem.co.jp',
         role: UserRole.TENANT_ADMIN,
         status: 'active',
+        tenant_id: 'sample-oem-push', // テナント管理者のテナントID
         lastLoginAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
         company: 'サンプル株式会社',
@@ -245,6 +279,7 @@ const UserManagement: React.FC = () => {
         email: 'admin@samplecompany.co.jp',
         role: UserRole.OPERATION_ADMIN,
         status: 'active',
+        tenant_id: 'sample-company', // サービス利用者のテナントID
         lastLoginAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
         company: 'サンプル会社',
@@ -269,6 +304,7 @@ const UserManagement: React.FC = () => {
         email: 'user@samplecompany.co.jp',
         role: UserRole.OPERATION_USER,
         status: 'active',
+        tenant_id: 'sample-company', // サービス利用者のテナントID
         lastLoginAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
         createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
         company: 'サンプル会社',
@@ -284,6 +320,31 @@ const UserManagement: React.FC = () => {
           analyticsAccess: true,
           userManagement: false,
           surveysCreation: false
+        }
+      },
+      // テナント管理者配下のサービス利用者（operation-3 は sample-oem-push テナントに属する）
+      {
+        id: 'operation-3',
+        username: 'tenant-company-admin',
+        email: 'admin@tenantcompany.co.jp',
+        role: UserRole.OPERATION_ADMIN,
+        status: 'active',
+        tenant_id: 'sample-oem-push', // テナント管理者のテナントに属するサービス利用者
+        lastLoginAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date(Date.now() - 120 * 24 * 60 * 60 * 1000).toISOString(),
+        company: 'テナント配下会社',
+        postalCode: '160-0022',
+        phoneNumber: '03-9876-5432',
+        address: '東京都新宿区',
+        permissions: {
+          internationalSms: true,
+          templateEditing: true,
+          bulkSending: true,
+          apiAccess: true,
+          scheduledSending: true,
+          analyticsAccess: true,
+          userManagement: false,
+          surveysCreation: true
         }
       }
     ];
@@ -351,15 +412,26 @@ const UserManagement: React.FC = () => {
     });
   };
 
-  // ユーザーフィルタリング
+  // 利用者フィルタリング
   const filterUsers = () => {
     let result = [...users];
     
-    // まずはユーザーのロールでフィルタリング（サービス利用者のみ表示）
-    result = result.filter(user => 
-      user.role === UserRole.OPERATION_ADMIN || 
-      user.role === UserRole.OPERATION_USER
-    );
+    // テナントコンテキストがある場合は、そのテナントに属するサービス利用者のみ表示
+    // テナントコンテキストがない場合は、システム管理者が直接管理するサービス利用者のみ表示
+    if (tenantContext) {
+      // テナント管理者として操作している場合、そのテナントに属するサービス利用者のみ表示
+      result = result.filter(user => 
+        (user.role === UserRole.OPERATION_ADMIN || user.role === UserRole.OPERATION_USER) && 
+        user.tenant_id === tenantContext.tenantId
+      );
+    } else {
+      // 通常のシステム管理者操作の場合、システム管理者が直接管理するサービス利用者のみ表示
+      // システム管理者が直接管理 = sample-company テナントID (この部分はモックデータに合わせる)
+      result = result.filter(user => 
+        (user.role === UserRole.OPERATION_ADMIN || user.role === UserRole.OPERATION_USER) &&
+        user.tenant_id === 'sample-company' // システム管理者の直接契約
+      );
+    }
     
     // 検索条件でフィルタリング
     if (searchTerm) {
@@ -409,12 +481,12 @@ const UserManagement: React.FC = () => {
     }
   };
   
-  // 特定ユーザーのアクティビティログを取得
+  // 特定利用者のアクティビティログを取得
   const getUserActivityLogs = (userId: string): UserActivityData[] => {
     return activityLogs.filter(log => log.userId === userId).slice(0, 20);
   };
   
-  // ユーザー契約情報取得
+  // 利用者契約情報取得
   const getUserContract = (userId: string): UserContractData | undefined => {
     return contracts.find(contract => contract.userId === userId);
   };
@@ -425,13 +497,13 @@ const UserManagement: React.FC = () => {
   const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   
-  // ユーザー詳細表示
+  // 利用者詳細表示
   const handleViewUser = (user: UserData) => {
     setSelectedUser(user);
     setSelectedTab('info');
   };
   
-  // ユーザー編集モーダル表示
+  // 利用者編集モーダル表示
   const handleEditUser = (user: UserData) => {
     setEditingUser(user);
     setFormData({
@@ -442,6 +514,9 @@ const UserManagement: React.FC = () => {
       postalCode: user.postalCode,
       phoneNumber: user.phoneNumber,
       address: user.address,
+      monthlyFee: user.monthlyFee || 0,
+      domesticSmsPrice: user.domesticSmsPrice || 3.3,
+      internationalSmsPrice: user.internationalSmsPrice || 10,
       permissions: { 
         internationalSms: user.permissions.internationalSms,
         templateEditing: user.permissions.templateEditing,
@@ -457,7 +532,7 @@ const UserManagement: React.FC = () => {
     setShowEditModal(true);
   };
   
-  // 新規ユーザー作成モーダル表示
+  // 新規利用者作成モーダル表示
   const handleShowCreateModal = () => {
     setFormData({
       username: '',
@@ -467,6 +542,9 @@ const UserManagement: React.FC = () => {
       postalCode: '',
       phoneNumber: '',
       address: '',
+      monthlyFee: 0,
+      domesticSmsPrice: 3.3,
+      internationalSmsPrice: 10,
       permissions: {
         internationalSms: false,
         templateEditing: true,
@@ -483,9 +561,9 @@ const UserManagement: React.FC = () => {
     setShowCreateModal(true);
   };
   
-  // ユーザー削除
+  // 利用者削除
   const handleDeleteUser = async (user: UserData) => {
-    if (confirm(`「${user.username}」を削除してもよろしいですか？`)) {
+    if (window.confirm(`「${user.username}」を削除してもよろしいですか？この操作は元に戻せません。`)) { // 確認メッセージをテナント管理と統一
       try {
         // 削除API呼び出しシミュレーション
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -494,17 +572,17 @@ const UserManagement: React.FC = () => {
         setUsers(users.filter(u => u.id !== user.id));
         toast.success(`「${user.username}」を削除しました`);
         
-        // 詳細表示中のユーザーが削除された場合は詳細表示を閉じる
+        // 詳細表示中の利用者が削除された場合は詳細表示を閉じる
         if (selectedUser?.id === user.id) {
           setSelectedUser(null);
         }
       } catch (error) {
-        toast.error('ユーザーの削除に失敗しました');
+        toast.error('利用者の削除に失敗しました');
       }
     }
   };
   
-  // ユーザーステータス切り替え
+  // 利用者ステータス切り替え
   const handleToggleStatus = async (user: UserData) => {
     try {
       // APIリクエストシミュレーション
@@ -514,10 +592,10 @@ const UserManagement: React.FC = () => {
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
       const updatedUser = { ...user, status: newStatus as 'active' | 'inactive' | 'pending' };
       
-      // ユーザーリスト更新
+      // 利用者リスト更新
       setUsers(users.map(u => u.id === user.id ? updatedUser : u));
       
-      // 詳細表示中のユーザーも更新
+      // 詳細表示中の利用者も更新
       if (selectedUser?.id === user.id) {
         setSelectedUser(updatedUser);
       }
@@ -565,7 +643,7 @@ const UserManagement: React.FC = () => {
     }
   };
   
-  // ユーザー作成フォーム用のresetForm関数を追加
+  // 利用者作成フォーム用のresetForm関数を追加
   const resetForm = () => {
     setFormData({
       username: '',
@@ -575,6 +653,9 @@ const UserManagement: React.FC = () => {
       postalCode: '',
       phoneNumber: '',
       address: '',
+      monthlyFee: 0,
+      domesticSmsPrice: 3.3,
+      internationalSmsPrice: 10,
       permissions: {
         internationalSms: false,
         templateEditing: false,
@@ -595,7 +676,7 @@ const UserManagement: React.FC = () => {
     const errors: Record<string, string> = {};
     
     if (!formData.username.trim()) {
-      errors.username = 'ユーザー名は必須です';
+      errors.username = '利用者名は必須です';
     }
     
     if (!formData.email.trim()) {
@@ -620,7 +701,7 @@ const UserManagement: React.FC = () => {
     return errors;
   };
   
-  // 新規ユーザー作成
+  // 新規利用者作成
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -637,25 +718,32 @@ const UserManagement: React.FC = () => {
       // モックAPIリクエスト（実際の実装では適切なAPIコールに置き換え）
       await new Promise(resolve => setTimeout(resolve, 1000));
       
+      // テナントIDの設定
+      const newTenantId = tenantContext ? tenantContext.tenantId : 'sample-company';
+      
       const newUser: UserData = {
         id: `user-${Date.now()}`,
         username: formData.username,
         email: formData.email,
         role: UserRole.OPERATION_USER,
         status: formData.status,
+        tenant_id: newTenantId, // テナントコンテキストによって決定されるテナントID
         lastLoginAt: new Date().toISOString(),
         createdAt: new Date().toISOString(),
         company: formData.company,
         postalCode: formData.postalCode,
         phoneNumber: formData.phoneNumber,
         address: formData.address,
+        monthlyFee: formData.monthlyFee,
+        domesticSmsPrice: formData.domesticSmsPrice,
+        internationalSmsPrice: formData.internationalSmsPrice,
         permissions: {
           ...formData.permissions,
           userManagement: false
         }
       };
       
-      // ユーザーリストに追加
+      // 利用者リストに追加
       setUsers([...users, newUser]);
       
       // モーダルを閉じる
@@ -665,19 +753,19 @@ const UserManagement: React.FC = () => {
       resetForm();
       
       // 成功メッセージ
-      toast.success('ユーザーが作成されました');
+      toast.success('利用者が作成されました');
       
       // 送信者名設定は同一画面で行うため、別画面への遷移は削除
       // navigateToMessageSettings(newUser.id);
     } catch (error) {
-      toast.error('ユーザーの作成に失敗しました');
+      toast.error('利用者の作成に失敗しました');
       console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
   
-  // ユーザー更新
+  // 利用者更新
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -695,7 +783,7 @@ const UserManagement: React.FC = () => {
       // 更新API呼び出しシミュレーション
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      // ユーザー情報更新
+      // 利用者情報更新
       const updatedUser: UserData = {
         ...editingUser,
         username: formData.username,
@@ -705,28 +793,31 @@ const UserManagement: React.FC = () => {
         postalCode: formData.postalCode,
         phoneNumber: formData.phoneNumber,
         address: formData.address,
+        monthlyFee: formData.monthlyFee,
+        domesticSmsPrice: formData.domesticSmsPrice,
+        internationalSmsPrice: formData.internationalSmsPrice,
         permissions: { 
           ...formData.permissions,
           userManagement: editingUser.permissions.userManagement
         }
       };
       
-      // ユーザー一覧を更新
+      // 利用者一覧を更新
       setUsers(users.map(u => u.id === editingUser.id ? updatedUser : u));
       
-      // 詳細表示中のユーザーが更新された場合は詳細表示も更新
+      // 詳細表示中の利用者が更新された場合は詳細表示も更新
       if (selectedUser?.id === editingUser.id) {
         setSelectedUser(updatedUser);
       }
       
       // モーダルを閉じる
       setShowEditModal(false);
-      toast.success('ユーザー情報を更新しました');
+      toast.success('利用者情報を更新しました');
       
       // 送信者名設定画面への遷移は不要になったので削除
       // navigateToMessageSettings(updatedUser.id);
     } catch (error) {
-      toast.error('ユーザー更新に失敗しました');
+      toast.error('利用者更新に失敗しました');
     } finally {
       setIsSubmitting(false);
     }
@@ -764,18 +855,18 @@ const UserManagement: React.FC = () => {
     }).format(amount);
   };
   
-  // ユーザー作成成功時にメッセージ設定画面に遷移する関数
+  // 利用者作成成功時にメッセージ設定画面に遷移する関数
   const navigateToMessageSettings = (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user) {
       // テスト確認用にコンソールログを追加
-      console.log(`ユーザー「${user.username}」の送信者名設定画面へ遷移します。UserID: ${userId}`);
-      // ユーザー情報をセット
+      console.log(`利用者「${user.username}」の送信者名設定画面へ遷移します。UserID: ${userId}`);
+      // 利用者情報をセット
       setSelectedUserForSettings(user);
       // メッセージ設定モーダルを表示
       setShowMessageSettings(true);
       
-      // テスト用：ユーザー作成から送信者名設定画面への遷移を記録
+      // テスト用：利用者作成から送信者名設定画面への遷移を記録
       window.sessionStorage.setItem('navigation_test', JSON.stringify({
         from: 'user_creation',
         to: 'message_settings',
@@ -783,7 +874,7 @@ const UserManagement: React.FC = () => {
         timestamp: new Date().toISOString()
       }));
     } else {
-      console.error(`ユーザーID ${userId} が見つかりません。送信者名設定画面への遷移に失敗しました。`);
+      console.error(`利用者ID ${userId} が見つかりません。送信者名設定画面への遷移に失敗しました。`);
     }
   };
   
@@ -794,11 +885,29 @@ const UserManagement: React.FC = () => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <h1 className="text-2xl font-bold text-grey-900 mb-6">ユーザー管理</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-grey-900">利用者管理</h1>
+        
+        {/* テナントコンテキスト表示 */}
+        {tenantContext && (
+          <div className="flex items-center">
+            <div className="bg-primary-50 text-primary-700 px-3 py-1 rounded-lg flex items-center mr-2">
+              <span className="text-sm font-medium">テナント：{tenantContext.tenantName}</span>
+            </div>
+            <button
+              onClick={handleExitTenantContext}
+              className="btn-secondary flex items-center gap-1 text-sm"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              テナント一覧に戻る
+            </button>
+          </div>
+        )}
+      </div>
 
       <div className="bg-white rounded-lg shadow">
         <div className="p-4 border-b border-grey-200">
-          <h2 className="text-lg font-medium text-grey-900 mb-4">ユーザー一覧</h2>
+          <h2 className="text-lg font-medium text-grey-900 mb-4">利用者一覧</h2>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4 flex-1">
               <div className="relative flex-1">
@@ -807,7 +916,7 @@ const UserManagement: React.FC = () => {
                 </div>
                 <input
                   type="search"
-                  placeholder="ユーザー名、メールアドレスなどで検索..."
+                  placeholder="利用者名、メールアドレスなどで検索..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="form-input pl-10 w-full"
@@ -859,8 +968,8 @@ const UserManagement: React.FC = () => {
                 <option value="all">すべてのロール</option>
                 <option value={UserRole.SYSTEM_ADMIN}>システム管理者</option>
                 <option value={UserRole.TENANT_ADMIN}>テナント管理者</option>
-                <option value={UserRole.OPERATION_ADMIN}>運用管理者</option>
-                <option value={UserRole.OPERATION_USER}>運用担当者</option>
+                <option value={UserRole.OPERATION_ADMIN}>利用者</option>
+                <option value={UserRole.OPERATION_USER}>利用者</option>
               </select>
               <select
                 value={statusFilter}
@@ -884,11 +993,11 @@ const UserManagement: React.FC = () => {
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-grey-400 mx-auto" />
-              <h3 className="mt-2 text-sm font-medium">ユーザーが見つかりません</h3>
+              <h3 className="mt-2 text-sm font-medium">利用者が見つかりません</h3>
               <p className="mt-1 text-sm text-grey-500">
                 {searchTerm || roleFilter !== 'all' || statusFilter !== 'all'
-                  ? '検索条件に一致するユーザーが見つかりませんでした。'
-                  : 'ユーザーが存在しません。'}
+                  ? '検索条件に一致する利用者が見つかりませんでした。'
+                  : '利用者が存在しません。'}
               </p>
             </div>
           ) : viewMode === 'grid' ? (
@@ -896,7 +1005,8 @@ const UserManagement: React.FC = () => {
               {currentItems.map((user) => (
                 <div
                   key={user.id}
-                  className="bg-white rounded-lg border hover:border-primary-500 transition-colors"
+                  className="bg-white rounded-lg border hover:border-primary-500 transition-colors cursor-pointer"
+                  onClick={() => handleViewUser(user)}
                 >
                   <div className="p-4">
                     <div className="flex items-start justify-between">
@@ -905,7 +1015,7 @@ const UserManagement: React.FC = () => {
                         <p className="text-sm text-grey-500">{user.email}</p>
                       </div>
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-grey-100 text-grey-800'
+                        user.status === 'active' ? 'bg-success-100 text-success-800' : 'bg-grey-100 text-grey-800'
                       }`}>
                         {user.status === 'active' ? '有効' : '無効'}
                       </span>
@@ -921,66 +1031,83 @@ const UserManagement: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="border-t p-4 flex justify-end gap-2">
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="btn-secondary text-sm"
-                    >
-                      編集
-                    </button>
-                    <button
-                      onClick={() => handleToggleStatus(user)}
-                      className={`text-sm ${
-                        user.status === 'active' ? 'btn-error' : 'btn-success'
-                      }`}
-                    >
-                      {user.status === 'active' ? '無効化' : '有効化'}
-                    </button>
-                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
-              {currentItems.map((user) => (
-                <div
-                  key={user.id}
-                  className="flex items-center justify-between p-4 bg-white border rounded-lg hover:shadow-sm transition-shadow duration-200"
-                >
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-grey-900 truncate">{user.username}</h3>
-                    <p className="mt-1 text-sm text-grey-500 truncate">{user.email}</p>
-                    <div className="mt-2 flex items-center gap-4 text-sm text-grey-500">
-                      <span className="flex items-center gap-1">
-                        <User className="h-4 w-4" />
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-grey-200">
+                <thead className="bg-grey-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-grey-500 uppercase tracking-wider">
+                      利用者名
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-grey-500 uppercase tracking-wider">
+                      ロール
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-grey-500 uppercase tracking-wider">
+                      最終ログイン
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-grey-500 uppercase tracking-wider">
+                      ステータス
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-grey-500 uppercase tracking-wider">
+                      操作
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-grey-200">
+                  {currentItems.map((user) => (
+                    <tr 
+                      key={user.id} 
+                      className="hover:bg-grey-50 cursor-pointer"
+                      onClick={() => handleViewUser(user)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div>
+                          <p className="text-sm font-medium text-grey-900">{user.username}</p>
+                          <p className="text-xs text-grey-500">{user.email}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-grey-500">
                         {roleDisplayNames[user.role]}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        最終ログイン: {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('ja-JP') : '未ログイン'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleEditUser(user)}
-                      className="p-1 text-grey-500 hover:text-primary-600 rounded hover:bg-grey-100"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleToggleStatus(user)}
-                      className={`p-1 rounded hover:bg-grey-100 ${
-                        user.status === 'active' 
-                          ? 'text-error-600 hover:text-error-900' 
-                          : 'text-primary-600 hover:text-primary-900'
-                      }`}
-                    >
-                      {user.status === 'active' ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-grey-500">
+                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('ja-JP') : '未ログイン'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          user.status === 'active' 
+                            ? 'bg-success-100 text-success-800' 
+                            : 'bg-grey-100 text-grey-800'
+                        }`}>
+                          {user.status === 'active' ? '有効' : '無効'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditUser(user);
+                          }}
+                          className="text-primary-600 hover:text-primary-900 mr-3"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteUser(user);
+                          }}
+                          className="text-error-600 hover:text-error-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -1013,7 +1140,7 @@ const UserManagement: React.FC = () => {
         )}
       </div>
 
-      {/* ユーザー作成/編集モーダル */}
+      {/* 利用者作成/編集モーダル */}
       {(showCreateModal || showEditModal) && (
         <div className="fixed inset-0 bg-grey-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
           <motion.div
@@ -1026,7 +1153,7 @@ const UserManagement: React.FC = () => {
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-medium">
-                  {showCreateModal ? '新規ユーザー作成' : 'ユーザー編集'}
+                  {showCreateModal ? '新規利用者作成' : '利用者編集'}
                 </h3>
                 <button
                   type="button"
@@ -1045,7 +1172,7 @@ const UserManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-grey-700 mb-2">
-                      ユーザー名
+                      利用者名 <span className="text-error-600 ml-1">*</span>
                     </label>
                     <input
                       type="text"
@@ -1061,7 +1188,7 @@ const UserManagement: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-grey-700 mb-2">
-                      メールアドレス
+                      メールアドレス <span className="text-error-600 ml-1">*</span>
                     </label>
                     <input
                       type="email"
@@ -1125,7 +1252,7 @@ const UserManagement: React.FC = () => {
                       電話番号
                     </label>
                     <input
-                      type="text"
+                      type="tel"
                       name="phoneNumber"
                       value={formData.phoneNumber}
                       onChange={handleInputChange}
@@ -1134,6 +1261,48 @@ const UserManagement: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-grey-700 mb-2">
+                      月額基本料金（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="monthlyFee"
+                      value={formData.monthlyFee}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
+                      国内SMS送信単価（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="domesticSmsPrice"
+                      value={formData.domesticSmsPrice}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
+                      海外SMS送信単価（円）
+                    </label>
+                    <input
+                      type="number"
+                      name="internationalSmsPrice"
+                      value={formData.internationalSmsPrice}
+                      onChange={handleInputChange}
+                      className="form-input w-full"
+                      min="0"
+                      step="0.1"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-grey-700 mb-2">
                       住所
                     </label>
                     <textarea
@@ -1141,98 +1310,368 @@ const UserManagement: React.FC = () => {
                       value={formData.address}
                       onChange={handleInputChange}
                       className="form-input w-full"
-                      rows={3}
+                      rows={2}
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-grey-700 mb-2">
-                      ステータス
-                    </label>
-                    <select
-                      name="status"
-                      value={formData.status}
-                      onChange={handleInputChange}
-                      className="form-select w-full"
-                    >
-                      <option value="active">有効</option>
-                      <option value="inactive">無効</option>
-                      <option value="pending">保留中</option>
-                    </select>
+                </div>
+                
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-medium mb-4">アクセス権限</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="internationalSms"
+                        name="internationalSms"
+                        checked={formData.permissions.internationalSms}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="internationalSms" className="ml-2 text-sm text-grey-700">
+                        海外SMS送信
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="templateEditing"
+                        name="templateEditing"
+                        checked={formData.permissions.templateEditing}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="templateEditing" className="ml-2 text-sm text-grey-700">
+                        テンプレート編集
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="bulkSending"
+                        name="bulkSending"
+                        checked={formData.permissions.bulkSending}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="bulkSending" className="ml-2 text-sm text-grey-700">
+                        一括送信
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="scheduledSending"
+                        name="scheduledSending"
+                        checked={formData.permissions.scheduledSending}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="scheduledSending" className="ml-2 text-sm text-grey-700">
+                        予約送信
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="analyticsAccess"
+                        name="analyticsAccess"
+                        checked={formData.permissions.analyticsAccess}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="analyticsAccess" className="ml-2 text-sm text-grey-700">
+                        分析レポート閲覧
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="surveysCreation"
+                        name="surveysCreation"
+                        checked={formData.permissions.surveysCreation}
+                        onChange={handlePermissionChange}
+                        className="form-checkbox rounded h-4 w-4 text-blue-600"
+                      />
+                      <label htmlFor="surveysCreation" className="ml-2 text-sm text-grey-700">
+                        アンケート作成
+                      </label>
+                    </div>
                   </div>
                 </div>
-
-                <div className="border-t pt-6">
-                  <h4 className="text-sm font-medium mb-4">権限設定</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center">
-                        <input
-                          id="surveysCreation"
-                          name="surveysCreation"
-                          type="checkbox"
-                          checked={formData.permissions.surveysCreation}
-                          onChange={handlePermissionChange}
-                          className="form-checkbox h-4 w-4"
-                        />
-                        <label htmlFor="surveysCreation" className="ml-2 block text-sm text-grey-700">
-                          アンケート作成
-                        </label>
+                
+                {/* 送信者名設定セクション - 管理者のみ表示 */}
+                {user?.role === 'SYSTEM_ADMIN' && (
+                  <div className="border-t pt-6">
+                    <h4 className="text-sm font-medium mb-4">送信者名設定</h4>
+                    
+                    {/* 国内送信用の送信者名設定 */}
+                    <div className="mb-6">
+                      <div className="flex justify-between items-center mb-2">
+                        <h5 className="text-sm font-medium text-grey-700 flex items-center">
+                          <Phone className="h-4 w-4 mr-1.5 text-primary-500" />
+                          国内送信用
+                        </h5>
                       </div>
-                      <div className="flex items-center">
-                        <input
-                          id="templateEditing"
-                          name="templateEditing"
-                          type="checkbox"
-                          checked={formData.permissions.templateEditing}
-                          onChange={handlePermissionChange}
-                          className="form-checkbox h-4 w-4"
-                        />
-                        <label htmlFor="templateEditing" className="ml-2 block text-sm text-grey-700">
-                          テンプレート編集
-                        </label>
+                      
+                      <div className="bg-grey-50 rounded-lg p-3">
+                        {/* 国内送信者名追加フォーム */}
+                        <div className="mb-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div className="md:col-span-1">
+                              <label className="block text-xs font-medium text-grey-700 mb-1">送信者名</label>
+                              <input
+                                type="text"
+                                className="form-input w-full text-sm"
+                                placeholder="例: 0120123456"
+                                value={domesticSenderNumberInput}
+                                onChange={(e) => setDomesticSenderNumberInput(e.target.value)}
+                              />
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-xs font-medium text-grey-700 mb-1">説明（任意）</label>
+                              <input
+                                type="text"
+                                className="form-input w-full text-sm"
+                                placeholder="例: カスタマーサポート"
+                                value={domesticSenderDescriptionInput}
+                                onChange={(e) => setDomesticSenderDescriptionInput(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <button
+                                type="button"
+                                className="btn-primary text-sm h-9 px-3 w-full"
+                                onClick={() => {
+                                  if (domesticSenderNumberInput.trim()) {
+                                    // 送信者名を追加
+                                    useSenderNumberStore.getState().addSenderNumber({
+                                      number: domesticSenderNumberInput.trim(),
+                                      description: domesticSenderDescriptionInput.trim() || undefined,
+                                      isInternational: false,
+                                      userId: editingUser?.id
+                                    });
+                                    
+                                    // 入力フィールドをクリア
+                                    setDomesticSenderNumberInput('');
+                                    setDomesticSenderDescriptionInput('');
+                                    
+                                    // 成功メッセージ
+                                    toast.success('国内送信用の送信者名を追加しました');
+                                  }
+                                }}
+                              >
+                                追加
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 国内送信用の送信者名一覧 */}
+                        {senderNumbers
+                          .filter(sn => !sn.isInternational && (
+                            sn.userId === (editingUser?.id || '') || 
+                            (!sn.userId && showEditModal) || 
+                            false
+                          ))
+                          .length > 0 ? (
+                          <div className="grid gap-2">
+                            {senderNumbers
+                              .filter(sn => !sn.isInternational && (
+                                sn.userId === (editingUser?.id || '') || 
+                                (!sn.userId && showEditModal) || 
+                                false
+                              ))
+                              .map(senderNumber => (
+                                <div key={senderNumber.id} className="bg-white p-2 rounded border border-grey-200 flex justify-between items-center">
+                                  <div className="flex items-center">
+                                    <Phone className="h-4 w-4 text-blue-500 mr-2" />
+                                    <div>
+                                      <p className="text-sm font-medium">{senderNumber.number}</p>
+                                      {senderNumber.description && (
+                                        <p className="text-xs text-grey-500">{senderNumber.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {senderNumber.userId && (
+                                      <button
+                                        type="button"
+                                        className="p-1 text-error-600 hover:bg-error-50 rounded"
+                                        onClick={() => {
+                                          if (window.confirm(`送信者名「${senderNumber.number}」を削除してもよろしいですか？`)) {
+                                            useSenderNumberStore.getState().deleteSenderNumber(senderNumber.id);
+                                            toast.success('送信者名を削除しました');
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            }
+                          </div>
+                        ) : (
+                          <p className="text-sm text-grey-500 text-center">登録された国内送信用の送信者名はありません</p>
+                        )}
                       </div>
                     </div>
                     
-                    <div className="space-y-3">
-                      <div className="flex items-center">
-                        <input
-                          id="internationalSms"
-                          name="internationalSms"
-                          type="checkbox"
-                          checked={formData.permissions.internationalSms}
-                          onChange={handlePermissionChange}
-                          className="form-checkbox h-4 w-4"
-                        />
-                        <label htmlFor="internationalSms" className="ml-2 block text-sm text-grey-700">
-                          国際SMS送信
-                        </label>
+                    {/* 海外送信用の送信者名設定 */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <h5 className="text-sm font-medium text-grey-700 flex items-center">
+                          <Globe className="h-4 w-4 mr-1.5 text-primary-500" />
+                          海外送信用
+                        </h5>
                       </div>
-                      <div className="flex items-center">
-                        <input
-                          id="analyticsAccess"
-                          name="analyticsAccess"
-                          type="checkbox"
-                          checked={formData.permissions.analyticsAccess}
-                          onChange={handlePermissionChange}
-                          className="form-checkbox h-4 w-4"
-                        />
-                        <label htmlFor="analyticsAccess" className="ml-2 block text-sm text-grey-700">
-                          分析機能アクセス
-                        </label>
+                      
+                      <div className="bg-grey-50 rounded-lg p-3">
+                        {/* 海外送信者名追加フォーム */}
+                        <div className="mb-3">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                            <div className="md:col-span-1">
+                              <label className="block text-xs font-medium text-grey-700 mb-1">送信者名</label>
+                              <input
+                                type="text"
+                                className="form-input w-full text-sm"
+                                placeholder="例: INFO"
+                                value={internationalSenderNumberInput}
+                                onChange={(e) => setInternationalSenderNumberInput(e.target.value)}
+                              />
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-xs font-medium text-grey-700 mb-1">説明（任意）</label>
+                              <input
+                                type="text"
+                                className="form-input w-full text-sm"
+                                placeholder="例: インフォメーション"
+                                value={internationalSenderDescriptionInput}
+                                onChange={(e) => setInternationalSenderDescriptionInput(e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <button
+                                type="button"
+                                className="btn-primary text-sm h-9 px-3 w-full"
+                                onClick={() => {
+                                  if (internationalSenderNumberInput.trim()) {
+                                    // 送信者名を追加
+                                    useSenderNumberStore.getState().addSenderNumber({
+                                      number: internationalSenderNumberInput.trim(),
+                                      description: internationalSenderDescriptionInput.trim() || undefined,
+                                      isInternational: true,
+                                      userId: editingUser?.id
+                                    });
+                                    
+                                    // 入力フィールドをクリア
+                                    setInternationalSenderNumberInput('');
+                                    setInternationalSenderDescriptionInput('');
+                                    
+                                    // 成功メッセージ
+                                    toast.success('海外送信用の送信者名を追加しました');
+                                  }
+                                }}
+                              >
+                                追加
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* 海外送信用の送信者名一覧 */}
+                        {senderNumbers
+                          .filter(sn => sn.isInternational && (
+                            sn.userId === (editingUser?.id || '') || 
+                            (!sn.userId && showEditModal) || 
+                            false
+                          ))
+                          .length > 0 ? (
+                          <div className="grid gap-2">
+                            {senderNumbers
+                              .filter(sn => sn.isInternational && (
+                                sn.userId === (editingUser?.id || '') || 
+                                (!sn.userId && showEditModal) || 
+                                false
+                              ))
+                              .map(senderNumber => (
+                                <div key={senderNumber.id} className="bg-white p-2 rounded border border-grey-200 flex justify-between items-center">
+                                  <div className="flex items-center">
+                                    <Globe className="h-4 w-4 text-blue-500 mr-2" />
+                                    <div>
+                                      <p className="text-sm font-medium">{senderNumber.number}</p>
+                                      {senderNumber.description && (
+                                        <p className="text-xs text-grey-500">{senderNumber.description}</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {senderNumber.userId && (
+                                      <button
+                                        type="button"
+                                        className="p-1 text-error-600 hover:bg-error-50 rounded"
+                                        onClick={() => {
+                                          if (window.confirm(`送信者名「${senderNumber.number}」を削除してもよろしいですか？`)) {
+                                            useSenderNumberStore.getState().deleteSenderNumber(senderNumber.id);
+                                            toast.success('送信者名を削除しました');
+                                          }
+                                        }}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))
+                            }
+                          </div>
+                        ) : (
+                          <p className="text-sm text-grey-500 text-center">登録された海外送信用の送信者名はありません</p>
+                        )}
                       </div>
                     </div>
                   </div>
+                )}
+                
+                <div className="flex items-center justify-start border-t pt-6">
+                  <span className="text-sm font-medium text-grey-700 mr-4">ステータス</span>
+                  <div className="flex space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('active')}
+                      className={`btn-sm ${
+                        formData.status === 'active' ? 'btn-primary' : 'btn-secondary'
+                      }`}
+                    >
+                      有効
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('inactive')}
+                      className={`btn-sm ${
+                        formData.status === 'inactive' ? 'btn-error' : 'btn-secondary'
+                      }`}
+                    >
+                      無効
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange('pending')}
+                      className={`btn-sm ${
+                        formData.status === 'pending' ? 'btn-warning' : 'btn-secondary'
+                      }`}
+                    >
+                      保留中
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex justify-end gap-3 pt-6 border-t">
+                
+                <div className="flex justify-end space-x-3 pt-6 border-t">
                   <button
                     type="button"
                     className="btn-secondary"
-                    onClick={() => {
-                      setShowCreateModal(false);
-                      setShowEditModal(false);
-                      setFormData(initialFormData);
-                    }}
+                    onClick={() => showCreateModal ? setShowCreateModal(false) : setShowEditModal(false)}
                   >
                     キャンセル
                   </button>
@@ -1284,235 +1723,216 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {/* ユーザー詳細モーダル */}
+      {/* 利用者詳細モーダル */}
       {selectedUser && (
-        <div className="fixed inset-0 bg-grey-900 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-grey-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden">
             <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-medium">
-                  ユーザー詳細：{selectedUser.username}
-                </h3>
+              <div className="flex justify-between items-start mb-6">
+                <h2 className="text-lg font-medium">利用者詳細</h2>
                 <button
-                  type="button"
-                  className="text-grey-400 hover:text-grey-500"
                   onClick={() => setSelectedUser(null)}
+                  className="text-grey-400 hover:text-grey-500"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
               
-              <div>
-                <div className="mb-4 border-b">
-                  <nav className="flex space-x-4">
-                    <button
-                      className={`pb-4 font-medium text-sm ${
-                        selectedTab === 'info' 
-                          ? 'text-primary-600 border-b-2 border-primary-600' 
-                          : 'text-grey-600 hover:text-grey-900'
-                      }`}
-                      onClick={() => setSelectedTab('info')}
-                    >
-                      基本情報
-                    </button>
-                    <button
-                      className={`pb-4 font-medium text-sm ${
-                        selectedTab === 'activity' 
-                          ? 'text-primary-600 border-b-2 border-primary-600' 
-                          : 'text-grey-600 hover:text-grey-900'
-                      }`}
-                      onClick={() => setSelectedTab('activity')}
-                    >
-                      アクティビティ
-                    </button>
-                    <button
-                      className={`pb-4 font-medium text-sm ${
-                        selectedTab === 'contract' 
-                          ? 'text-primary-600 border-b-2 border-primary-600' 
-                          : 'text-grey-600 hover:text-grey-900'
-                      }`}
-                      onClick={() => setSelectedTab('contract')}
-                    >
-                      契約情報
-                    </button>
-                  </nav>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">利用者名</p>
+                    <p className="font-medium">{selectedUser.username}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">ステータス</p>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      selectedUser.status === 'active' ? 'bg-success-100 text-success-800' : 'bg-grey-100 text-grey-800'
+                    }`}>
+                      {selectedUser.status === 'active' ? '有効' : '無効'}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">メールアドレス</p>
+                    <p className="break-words">{selectedUser.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">ロール</p>
+                    <p>{roleDisplayNames[selectedUser.role]}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">郵便番号</p>
+                    <p>{selectedUser.postalCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">電話番号</p>
+                    <p>{selectedUser.phoneNumber}</p>
+                  </div>
+                  <div className="md:col-span-3">
+                    <p className="text-sm font-medium text-grey-500 mb-1">住所</p>
+                    <p>{selectedUser.address}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">月額基本料金</p>
+                    <p>{Math.floor(selectedUser.monthlyFee || 0).toLocaleString()}円</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">国内SMS送信単価</p>
+                    <p>{Math.floor(selectedUser.domesticSmsPrice || 0).toLocaleString()}円</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-grey-500 mb-1">海外SMS送信単価</p>
+                    <p>{Math.floor(selectedUser.internationalSmsPrice || 0).toLocaleString()}円</p>
+                  </div>
                 </div>
                 
-                {/* 基本情報 */}
-                {selectedTab === 'info' && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">ユーザー名</h4>
-                        <p className="text-grey-900">{selectedUser.username}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">メールアドレス</h4>
-                        <p className="text-grey-900">{selectedUser.email}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">会社名</h4>
-                        <p className="text-grey-900">{selectedUser.company}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">ステータス</h4>
-                        <p className="text-grey-900">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            selectedUser.status === 'active' 
-                              ? 'bg-success-100 text-success-800' 
-                              : 'bg-grey-100 text-grey-800'
-                          }`}>
-                            {selectedUser.status === 'active' ? '有効' : '無効'}
-                          </span>
-                        </p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">最終ログイン</h4>
-                        <p className="text-grey-900">{formatDate(selectedUser.lastLoginAt)}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">作成日</h4>
-                        <p className="text-grey-900">{formatDate(selectedUser.createdAt)}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">ロール</h4>
-                        <p className="text-grey-900">{roleDisplayNames[selectedUser.role]}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">郵便番号</h4>
-                        <p className="text-grey-900">{selectedUser.postalCode}</p>
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">電話番号</h4>
-                        <p className="text-grey-900">{selectedUser.phoneNumber}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <h4 className="text-sm font-medium text-grey-500 mb-1">住所</h4>
-                        <p className="text-grey-900">{selectedUser.address}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-6">
-                      <h4 className="text-sm font-medium text-grey-700 mb-3">権限一覧</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {Object.entries(selectedUser.permissions).map(([key, value]) => (
-                          <div key={key} className="flex items-center">
-                            <div className={`w-4 h-4 rounded-full mr-2 ${value ? 'bg-success-500' : 'bg-grey-200'}`}>
-                              {value && <Check className="h-3 w-3 text-white" />}
-                            </div>
-                            <span className="text-sm text-grey-700">{key}</span>
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-medium mb-4">権限設定</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {Object.entries(selectedUser.permissions).map(([key, value]) => {
+                      // userManagementとapiAccessは表示しない
+                      if (key === 'userManagement' || key === 'apiAccess') return null;
+                      
+                      // 権限名を日本語表示に変換
+                      const permissionLabels: Record<string, string> = {
+                        internationalSms: '海外SMS送信',
+                        templateEditing: 'テンプレート編集',
+                        bulkSending: '一括送信',
+                        scheduledSending: '予約送信',
+                        analyticsAccess: '分析レポート閲覧',
+                        surveysCreation: 'アンケート作成'
+                      };
+                      
+                      return (
+                        <div key={key} className="flex items-center">
+                          <div className={`w-4 h-4 rounded ${value ? 'bg-blue-600' : 'bg-grey-200'}`}>
+                            {value && <Check className="h-4 w-4 text-white" />}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end gap-2 pt-4 mt-6 border-t">
-                      <button
-                        className="btn-secondary text-sm"
-                        onClick={() => handleEditUser(selectedUser)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        編集
-                      </button>
-                      <button
-                        className={`text-sm ${
-                          selectedUser.status === 'active' 
-                            ? 'btn-error' 
-                            : 'btn-success'
-                        }`}
-                        onClick={() => handleToggleStatus(selectedUser)}
-                      >
-                        {selectedUser.status === 'active' ? (
-                          <>
-                            <X className="h-4 w-4 mr-1" />
-                            無効化
-                          </>
-                        ) : (
-                          <>
-                            <Check className="h-4 w-4 mr-1" />
-                            有効化
-                          </>
-                        )}
-                      </button>
-                    </div>
+                          <span className="ml-2 text-sm">{permissionLabels[key] || key}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-                
-                {/* アクティビティ履歴 */}
-                {selectedTab === 'activity' && (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-grey-700">最近のアクティビティ</h4>
-                    <div className="max-h-96 overflow-y-auto">
-                      {getUserActivityLogs(selectedUser.id).map((log) => (
-                        <div key={log.id} className="py-3 border-b border-grey-100 last:border-0">
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0 mr-3">
-                              <Activity className="h-5 w-5 text-grey-400" />
-                            </div>
-                            <div>
-                              <p className="text-sm text-grey-900">{log.details}</p>
-                              <div className="flex mt-1 text-xs text-grey-500">
-                                <p>{formatDate(log.timestamp)}</p>
-                                <span className="mx-1">•</span>
-                                <p>{log.ipAddress}</p>
+                </div>
+
+                {/* 送信者名設定セクション */}
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-medium mb-4">送信者名設定</h4>
+                  <div className="mb-4">
+                    <h5 className="text-sm font-medium text-grey-700 mb-2 flex items-center">
+                      <Phone className="h-4 w-4 mr-1.5 text-primary-500" />
+                      国内送信用
+                    </h5>
+                    <div className="bg-grey-50 rounded-lg p-3">
+                      {/* 国内送信用の送信者名一覧をここに表示 */}
+                      {senderNumbers
+                        .filter(sn => !sn.isInternational && (sn.userId === selectedUser.id || !sn.userId))
+                        .length > 0 ? (
+                        <div className="grid gap-2">
+                          {senderNumbers
+                            .filter(sn => !sn.isInternational && (sn.userId === selectedUser.id || !sn.userId))
+                            .map(senderNumber => (
+                              <div key={senderNumber.id} className="bg-white p-2 rounded border border-grey-200 flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <Phone className="h-4 w-4 text-blue-500 mr-2" />
+                                  <div>
+                                    <p className="text-sm font-medium">{senderNumber.number}</p>
+                                    {senderNumber.description && (
+                                      <p className="text-xs text-grey-500">{senderNumber.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="p-1 text-error-600 hover:bg-error-50 rounded"
+                                    onClick={() => {
+                                      if (window.confirm(`送信者名「${senderNumber.number}」を削除してもよろしいですか？`)) {
+                                        useSenderNumberStore.getState().deleteSenderNumber(senderNumber.id);
+                                        toast.success('送信者名を削除しました');
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            ))
+                          }
                         </div>
-                      ))}
+                      ) : (
+                        <p className="text-sm text-grey-500 text-center">登録された国内送信用の送信者名はありません</p>
+                      )}
                     </div>
                   </div>
-                )}
-                
-                {/* 契約情報 */}
-                {selectedTab === 'contract' && (
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-grey-700">契約情報</h4>
-                    {getUserContract(selectedUser.id) ? (
-                      <div className="border rounded-lg p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-grey-500 mb-1">契約プラン</h4>
-                            <p className="text-grey-900">{getUserContract(selectedUser.id)?.planName}</p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-grey-500 mb-1">月額料金</h4>
-                            <p className="text-grey-900">{formatCurrency(getUserContract(selectedUser.id)?.monthlyFee || 0)}</p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-grey-500 mb-1">契約期間</h4>
-                            <p className="text-grey-900">
-                              {formatDateOnly(getUserContract(selectedUser.id)?.startDate || '')} 〜 
-                              {formatDateOnly(getUserContract(selectedUser.id)?.endDate || '')}
-                            </p>
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-grey-500 mb-1">ステータス</h4>
-                            <p className="text-grey-900">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                getUserContract(selectedUser.id)?.status === 'active' 
-                                  ? 'bg-success-100 text-success-800' 
-                                  : getUserContract(selectedUser.id)?.status === 'pending'
-                                  ? 'bg-warning-100 text-warning-800'
-                                  : 'bg-grey-100 text-grey-800'
-                              }`}>
-                                {getUserContract(selectedUser.id)?.status === 'active' 
-                                  ? '有効' 
-                                  : getUserContract(selectedUser.id)?.status === 'pending'
-                                  ? '審査中'
-                                  : '期限切れ'}
-                              </span>
-                            </p>
-                          </div>
+                  
+                  <div>
+                    <h5 className="text-sm font-medium text-grey-700 mb-2 flex items-center">
+                      <Globe className="h-4 w-4 mr-1.5 text-primary-500" />
+                      海外送信用
+                    </h5>
+                    <div className="bg-grey-50 rounded-lg p-3">
+                      {/* 海外送信用の送信者名一覧をここに表示 */}
+                      {senderNumbers
+                        .filter(sn => sn.isInternational && (sn.userId === selectedUser.id || !sn.userId))
+                        .length > 0 ? (
+                        <div className="grid gap-2">
+                          {senderNumbers
+                            .filter(sn => sn.isInternational && (sn.userId === selectedUser.id || !sn.userId))
+                            .map(senderNumber => (
+                              <div key={senderNumber.id} className="bg-white p-2 rounded border border-grey-200 flex justify-between items-center">
+                                <div className="flex items-center">
+                                  <Globe className="h-4 w-4 text-blue-500 mr-2" />
+                                  <div>
+                                    <p className="text-sm font-medium">{senderNumber.number}</p>
+                                    {senderNumber.description && (
+                                      <p className="text-xs text-grey-500">{senderNumber.description}</p>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    className="p-1 text-error-600 hover:bg-error-50 rounded"
+                                    onClick={() => {
+                                      if (window.confirm(`送信者名「${senderNumber.number}」を削除してもよろしいですか？`)) {
+                                        useSenderNumberStore.getState().deleteSenderNumber(senderNumber.id);
+                                        toast.success('送信者名を削除しました');
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))
+                          }
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-6 bg-grey-50 rounded-lg">
-                        <p className="text-grey-500">契約情報がありません</p>
-                      </div>
-                    )}
+                      ) : (
+                        <p className="text-sm text-grey-500 text-center">登録された海外送信用の送信者名はありません</p>
+                      )}
+                    </div>
                   </div>
-                )}
+                </div>
+                
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
+                  <button
+                    className="btn-secondary"
+                    onClick={() => setSelectedUser(null)}
+                  >
+                    閉じる
+                  </button>
+                  
+                  <button
+                    className="btn-primary"
+                    onClick={() => {
+                      setSelectedUser(null);
+                      handleEditUser(selectedUser);
+                    }}
+                  >
+                    編集
+                  </button>
+                </div>
               </div>
             </div>
           </div>

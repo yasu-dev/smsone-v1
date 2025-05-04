@@ -343,9 +343,10 @@ const MessageHistory: React.FC = () => {
                         <StatusBadge status={message.status} />
                       </td>
                       <td className="px-6 py-4 whitespace-normal text-right text-sm font-medium">
-                        <button className="text-grey-400 hover:text-grey-600">
+                        {/* 省略メニューアイコンを非表示にする */}
+                        {/* <button className="text-grey-400 hover:text-grey-600">
                           <MoreHorizontal className="h-5 w-5" />
-                        </button>
+                        </button> */}
                       </td>
                     </tr>
                   ))}

@@ -37,4 +37,25 @@ export interface TenantContextType {
   setTenant: (tenant: Tenant) => void;
   setUser: (user: TenantUser) => void;
   logout: () => void;
+}
+
+export interface TenantData {
+  id: string;
+  name: string;
+  domain: string;
+  subdomain: string;
+  primaryColor: string;
+  secondaryColor: string;
+  logoUrl: string;
+  contactEmail: string;
+  postalCode: string;
+  phoneNumber: string;
+  address: string;
+  status: 'active' | 'inactive' | 'pending';
+  userCount: number;
+  createdAt: string;
+  contractEndDate: string;
+  monthlyFee?: number; // 月額基本料金
+  domesticSmsPrice?: number; // 国内SMS送信単価
+  internationalSmsPrice?: number; // 海外SMS送信単価
 } 

@@ -938,13 +938,14 @@ const BulkSendForm: React.FC = () => {
   const handleSenderNumberChange = (number: string) => {
     setSenderNumber(number);
     
-    // 送信者名が国際送信対応かチェック
+    // 送信者名が海外送信対応かチェック
     const selectedSender = useSenderNumberStore.getState().senderNumbers.find(sn => sn.number === number);
     if (selectedSender && selectedSender.isInternational) {
-      // 国際送信対応の送信者名が選択された場合、国際送信モードを有効化
+      // 海外送信対応の送信者名が選択された場合、海外送信モードを有効化
       setIsInternational(true);
+      setHasInternationalNumbers(true);
     } else {
-      // 通常の電話番号が選択された場合は国際送信モードを無効化
+      // 通常の電話番号が選択された場合は海外送信モードを無効化
       setIsInternational(false);
       setCountryCode(undefined);
     }
@@ -1228,6 +1229,14 @@ const BulkSendForm: React.FC = () => {
                   onChange={handleSenderNumberChange}
                   initialSenderNumber={senderNumber}
                   disabled={isProcessing}
+                  onSenderTypeChange={(isIntl) => {
+                    setIsInternational(isIntl);
+                    if (isIntl) {
+                      setHasInternationalNumbers(true);
+                    } else {
+                      setCountryCode(undefined);
+                    }
+                  }}
                 />
           </motion.div>
 
@@ -1654,6 +1663,16 @@ const BulkSendForm: React.FC = () => {
                           <li>エクセルファイルの場合、顧客名とメッセージ内容の列は自動的に認識されます</li>
                         </ul>
                         
+                        <p className="font-medium mt-3 mb-1">データの優先順位について：</p>
+                        <div className="bg-white p-2 rounded border border-grey-200 mb-2">
+                          <p className="font-medium text-primary-600 text-xs mb-1">メッセージの適用優先順位</p>
+                          <ol className="list-decimal pl-4 text-xs space-y-1">
+                            <li className="font-medium">ファイル内のメッセージ列の値（J列、message列、メッセージ列など）</li>
+                            <li>このテキストエリアに入力したメッセージテンプレート</li>
+                          </ol>
+                          <p className="text-xs mt-2 text-grey-600">※ ファイル内に「J列」「message列」「メッセージ列」などが存在する場合、そのデータが最優先で使用されます。存在しない場合のみ、テキストエリアのテンプレートが適用されます。</p>
+                        </div>
+                        
                         <p className="font-medium mt-3 mb-1">使用可能なタグ一覧：</p>
                         <ul className="list-disc pl-4 space-y-1">
                           <li>{'{customerName}'} - 顧客名</li>
@@ -1968,11 +1987,12 @@ const BulkSendForm: React.FC = () => {
                       key.toLowerCase() === 'sms' || 
                       key.toLowerCase() === '内容'
                     )) && (
-                      <div className="mt-2 text-xs text-grey-500 italic flex items-start">
-                        <AlertCircle className="w-3 h-3 inline mr-1 mt-0.5 flex-shrink-0" />
-                        <span>
-                          ファイルにメッセージ列（J列）が含まれる場合、各行のメッセージがこのテンプレートより優先されます
-                        </span>
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-100 rounded-md text-xs text-grey-700 flex items-start">
+                        <AlertCircle className="w-4 h-4 inline mr-1 mt-0.5 flex-shrink-0 text-warning-500" />
+                        <div>
+                          <p className="font-medium mb-0.5">※ メッセージ優先順位の注意</p>
+                          <p>ファイルにメッセージ列（J列、message列など）が含まれているため、各行のメッセージ内容がこのテンプレートより優先して使用されます。メッセージ列に値がない行のみ、このテンプレートが適用されます。</p>
+                        </div>
                       </div>
                     )}
                   </div>

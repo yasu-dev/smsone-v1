@@ -40,7 +40,8 @@ const TagManager: React.FC = () => {
   // 検索フィルタ
   const filteredTags = tags.filter(tag => 
     tag.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (tag.description && tag.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    (tag.description && tag.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (tag.value && tag.value.toLowerCase().includes(searchTerm.toLowerCase()))
   );
   
   // ページネーション

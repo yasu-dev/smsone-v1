@@ -43,6 +43,7 @@ export interface BillingUser {
   internationalSmsPrice: number;
   status: 'active' | 'inactive' | 'overdue' | 'canceled' | 'pending';
   createdAt?: string;
+  role?: string;
   billingHistory: BillingHistory[];
 }
 
@@ -76,18 +77,21 @@ interface BillingState {
 // モックデータ
 const mockUsers: BillingUser[] = [
   {
-    id: 'tenant-1',
-    username: 'sample-oem-admin',
-    company: 'サンプル株式会社',
-    email: 'admin@samplecompany.jp',
-    address: '東京都千代田区千代田1-1-1',
-    postalCode: '100-0001',
+    id: 'user1',
+    username: 'sample-corp',
+    company: '株式会社サンプル',
+    email: 'billing@sample.co.jp',
+    address: '東京都渋谷区神宮前1-1-1',
     phoneNumber: '03-1234-5678',
-    monthlyFee: 50000,
-    domesticSmsPrice: 5,
-    internationalSmsPrice: 15,
+    postalCode: '150-0001',
+    companyName: 'Topaz合同会社',
+    contactEmail: 'contact@topaz.jp',
+    monthlyFee: 5000,
+    domesticSmsPrice: 3.3,
+    internationalSmsPrice: 10,
     status: 'active',
-    createdAt: '2024-01-01',
+    role: 'TENANT_ADMIN',
+    createdAt: '2023-01-15',
     billingHistory: Array.from({ length: 15 }, (_, i) => {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
@@ -107,18 +111,19 @@ const mockUsers: BillingUser[] = [
     }).reverse()
   },
   {
-    id: 'tenant-2',
-    username: 'test-marketing-admin',
-    company: 'テストマーケティング',
-    email: 'info@testmarketing.co.jp',
-    address: '東京都新宿区新宿3-1-1',
-    postalCode: '160-0022',
+    id: 'user2',
+    username: 'example-inc',
+    company: '株式会社エグザンプル',
+    email: 'finance@example.co.jp',
+    address: '東京都新宿区新宿2-2-2',
     phoneNumber: '03-9876-5432',
-    monthlyFee: 30000,
-    domesticSmsPrice: 5,
-    internationalSmsPrice: 15,
+    postalCode: '160-0022',
+    monthlyFee: 3000,
+    domesticSmsPrice: 3.0,
+    internationalSmsPrice: 9.0,
     status: 'active',
-    createdAt: '2024-01-01',
+    role: 'OPERATION_USER',
+    createdAt: '2023-02-20',
     billingHistory: Array.from({ length: 15 }, (_, i) => {
       const date = new Date();
       date.setMonth(date.getMonth() - i);

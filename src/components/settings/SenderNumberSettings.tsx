@@ -50,10 +50,11 @@ export function SenderNumberSettings({
     loadSenderNumbers, 
     addSenderNumber, 
     updateSenderNumber, 
-    deleteSenderNumber 
+    deleteSenderNumber,
+    canManageSenderNumbers
   } = useSenderNumberStore();
   
-  const { user } = useAuthStore();
+  const { user, hasPermission } = useAuthStore();
   
   const [newNumber, setNewNumber] = useState('');
   const [newDescription, setNewDescription] = useState('');
@@ -74,20 +75,28 @@ export function SenderNumberSettings({
   
   // ユーザーID (プロパティ経由で渡された場合はそれを使用、そうでない場合は現在ログイン中のユーザー)
   const effectiveUserId = propUserId || user?.id || undefined;
-  const isAdmin = user?.role === 'admin';
+  
+  // システム管理者かどうか
+  const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
+  
+  // 海外SMS送信権限があるかどうか
+  const hasInternationalSmsPermission = hasPermission('internationalSms');
+  
+  // 送信者名を編集できるかどうか
+  const canEditSenderNumbers = canManageSenderNumbers();
   
   // 送信者名をフィルタリング
   const phoneNumbers = senderNumbers.filter(num => 
-    (num.userId === undefined || num.userId === effectiveUserId || isAdmin)
+    (num.userId === undefined || num.userId === effectiveUserId || isSystemAdmin)
   );
 
   // 国内送信用の番号
   const domesticNumbers = phoneNumbers.filter(num => !num.isInternational);
   
-  // 国際送信用の番号
+  // 海外送信用の番号
   const internationalNumbers = phoneNumbers.filter(num => num.isInternational);
 
-  // 国内/国際切り替え
+  // 国内/海外切り替え
   const handleSwitchToInternational = () => {
     setIsInternational(true);
   };
@@ -98,17 +107,22 @@ export function SenderNumberSettings({
 
   // 送信者番号の追加
   const handleAddNumber = async () => {
+    if (!canEditSenderNumbers) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     if (!newNumber) {
       toast.error('送信者名または電話番号を入力してください');
       return;
     }
     
     try {
-      // 国内/国際フラグに基づいて送信者名を追加
+      // 国内/海外フラグに基づいて送信者名を追加
       await addSenderNumber({
         number: newNumber,
         description: newDescription || undefined,
-        isInternational: isInternational, // 国内/国際の選択状態
+        isInternational: isInternational, // 国内/海外の選択状態
         isPhoneNumber: !isInternational && /^\d+$/.test(newNumber),
         userId: hideSharing ? effectiveUserId : undefined
       });
@@ -118,7 +132,7 @@ export function SenderNumberSettings({
       setNewDescription('');
       
       // 成功メッセージの表示
-      toast.success(`${isInternational ? '国際' : '国内'}送信用の送信者名を追加しました`);
+      toast.success(`${isInternational ? '海外' : '国内'}送信用の送信者名を追加しました`);
       
       // 追加した送信者名のセクションまでスクロール
       setTimeout(() => {
@@ -150,6 +164,11 @@ export function SenderNumberSettings({
 
   // 送信者番号の編集を開始
   const startEditing = (senderNumber: SenderNumber) => {
+    if (!canEditSenderNumbers) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     setEditingId(senderNumber.id);
     setEditNumber(senderNumber.number);
     setEditDescription(senderNumber.description || '');
@@ -157,6 +176,11 @@ export function SenderNumberSettings({
 
   // 送信者番号の編集を保存
   const saveEditing = async () => {
+    if (!canEditSenderNumbers) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     if (!editingId) return;
     
     if (!editNumber.trim()) {
@@ -189,12 +213,22 @@ export function SenderNumberSettings({
 
   // 送信者番号の削除を確認
   const confirmDelete = (id: string) => {
+    if (!canEditSenderNumbers) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     setSenderNumberToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   // 送信者番号を削除
   const handleDeleteSenderNumber = async () => {
+    if (!canEditSenderNumbers) {
+      toast.error('送信者名の管理権限がありません');
+      return;
+    }
+    
     if (!senderNumberToDelete) return;
     
     try {
@@ -207,6 +241,15 @@ export function SenderNumberSettings({
       console.error(error);
     }
   };
+
+  // システム管理者以外は表示しない
+  if (!isSystemAdmin && !isLoading) {
+    return (
+      <div className="p-4 text-center text-gray-500">
+        送信者名の設定はシステム管理者のみ可能です
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -238,6 +281,7 @@ export function SenderNumberSettings({
                     onChange={(e) => setNewNumber(e.target.value)}
                     className="mt-1"
                     placeholder="SMS送信時に表示される送信者名を入力"
+                    disabled={!canEditSenderNumbers}
                   />
                 </div>
                 <div>
@@ -249,6 +293,7 @@ export function SenderNumberSettings({
                     onChange={(e) => setNewDescription(e.target.value)}
                     className="mt-1"
                     placeholder="この送信者名の用途など"
+                    disabled={!canEditSenderNumbers}
                   />
                 </div>
                 
@@ -263,7 +308,8 @@ export function SenderNumberSettings({
                           !isInternational 
                             ? 'bg-primary-100 text-primary-800 border border-primary-200 shadow-sm font-medium' 
                             : 'bg-grey-100 text-grey-700 border border-grey-200 hover:bg-grey-200'
-                        }`}
+                        } ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!canEditSenderNumbers}
                       >
                         <Phone className={`h-4 w-4 mr-2 ${!isInternational ? 'text-primary-600' : 'text-grey-500'}`} />
                         国内送信用
@@ -275,15 +321,16 @@ export function SenderNumberSettings({
                           isInternational 
                             ? 'bg-primary-100 text-primary-800 border border-primary-200 shadow-sm font-medium' 
                             : 'bg-grey-100 text-grey-700 border border-grey-200 hover:bg-grey-200'
-                        }`}
+                        } ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        disabled={!canEditSenderNumbers}
                       >
                         <Globe className={`h-4 w-4 mr-2 ${isInternational ? 'text-primary-600' : 'text-grey-500'}`} />
-                        国際送信用
+                        海外送信用
                       </button>
                     </div>
                     <p className="mt-2 text-xs text-grey-600">
                       {isInternational 
-                        ? '国際送信用の送信者名は、海外の宛先への送信に使用されます。英数字や日本語など、文字列で指定できます。' 
+                        ? '海外送信用の送信者名は、海外の宛先への送信に使用されます。英数字や日本語など、文字列で指定できます。' 
                         : '国内送信用の送信者名は、国内の宛先への送信に使用されます。電話番号形式で入力すると、ドコモ、au、楽天モバイル宛てに送信者番号として表示されます。'}
                     </p>
                   </div>
@@ -292,8 +339,8 @@ export function SenderNumberSettings({
                 <div className="flex justify-end mt-2">
                   <Button 
                     onClick={handleAddNumber}
-                    disabled={isLoading || !newNumber.trim()}
-                    className="flex items-center bg-blue-600 text-white hover:bg-blue-700 px-5 py-2"
+                    disabled={isLoading || !newNumber.trim() || !canEditSenderNumbers}
+                    className={`flex items-center bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
                     追加
@@ -330,6 +377,7 @@ export function SenderNumberSettings({
                                   type="text"
                                   value={editNumber}
                                   onChange={(e) => setEditNumber(e.target.value)}
+                                  disabled={!canEditSenderNumbers}
                                 />
                               ) : (
                                 <div className="flex items-center">
@@ -344,6 +392,7 @@ export function SenderNumberSettings({
                                   type="text"
                                   value={editDescription}
                                   onChange={(e) => setEditDescription(e.target.value)}
+                                  disabled={!canEditSenderNumbers}
                                 />
                               ) : (
                                 senderNumber.description || '-'
@@ -356,12 +405,14 @@ export function SenderNumberSettings({
                                     <Button
                                       className="p-2 hover:bg-gray-100 rounded-full"
                                       onClick={saveEditing}
+                                      disabled={!canEditSenderNumbers}
                                     >
                                       <Check className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       className="p-2 hover:bg-gray-100 rounded-full"
                                       onClick={handleCancelEdit}
+                                      disabled={!canEditSenderNumbers}
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
@@ -369,14 +420,16 @@ export function SenderNumberSettings({
                                 ) : (
                                   <>
                                     <Button
-                                      className="p-2 hover:bg-gray-100 rounded-full"
+                                      className={`p-2 hover:bg-gray-100 rounded-full ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
                                       onClick={() => startEditing(senderNumber)}
+                                      disabled={!canEditSenderNumbers}
                                     >
                                       <Pencil className="h-4 w-4" />
                                     </Button>
                                     <Button
-                                      className="p-2 hover:bg-red-50 rounded-full text-red-500"
+                                      className={`p-2 hover:bg-red-50 rounded-full text-red-500 ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
                                       onClick={() => confirmDelete(senderNumber.id)}
+                                      disabled={!canEditSenderNumbers}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -392,17 +445,17 @@ export function SenderNumberSettings({
                 )}
               </div>
               
-              {/* 国際送信用の送信者名一覧 */}
+              {/* 海外送信用の送信者名一覧 - 海外SMS送信権限がある場合のみ表示 */}
               {!hideInternationalSettings && (
                 <div ref={internationalSectionRef}>
                   <h3 className="text-sm font-medium text-grey-700 mb-3 flex items-center">
                     <Globe className="h-4 w-4 mr-1.5 text-primary-500" />
-                    国際送信用
+                    海外送信用
                     {isInternational && <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700">現在選択中</span>}
                   </h3>
                   
                   {internationalNumbers.length === 0 ? (
-                    <div className="p-4 text-center text-gray-500 bg-gray-50 rounded">登録された国際送信用の送信者名はありません</div>
+                    <div className="p-4 text-center text-gray-500 bg-gray-50 rounded">登録された海外送信用の送信者名はありません</div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
@@ -422,6 +475,7 @@ export function SenderNumberSettings({
                                     type="text"
                                     value={editNumber}
                                     onChange={(e) => setEditNumber(e.target.value)}
+                                    disabled={!canEditSenderNumbers}
                                   />
                                 ) : (
                                   <div className="flex items-center">
@@ -436,6 +490,7 @@ export function SenderNumberSettings({
                                     type="text"
                                     value={editDescription}
                                     onChange={(e) => setEditDescription(e.target.value)}
+                                    disabled={!canEditSenderNumbers}
                                   />
                                 ) : (
                                   senderNumber.description || '-'
@@ -448,12 +503,14 @@ export function SenderNumberSettings({
                                       <Button
                                         className="p-2 hover:bg-gray-100 rounded-full"
                                         onClick={saveEditing}
+                                        disabled={!canEditSenderNumbers}
                                       >
                                         <Check className="h-4 w-4" />
                                       </Button>
                                       <Button
                                         className="p-2 hover:bg-gray-100 rounded-full"
                                         onClick={handleCancelEdit}
+                                        disabled={!canEditSenderNumbers}
                                       >
                                         <X className="h-4 w-4" />
                                       </Button>
@@ -461,14 +518,16 @@ export function SenderNumberSettings({
                                   ) : (
                                     <>
                                       <Button
-                                        className="p-2 hover:bg-gray-100 rounded-full"
+                                        className={`p-2 hover:bg-gray-100 rounded-full ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         onClick={() => startEditing(senderNumber)}
+                                        disabled={!canEditSenderNumbers}
                                       >
                                         <Pencil className="h-4 w-4" />
                                       </Button>
                                       <Button
-                                        className="p-2 hover:bg-red-50 rounded-full text-red-500"
+                                        className={`p-2 hover:bg-red-50 rounded-full text-red-500 ${!canEditSenderNumbers ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         onClick={() => confirmDelete(senderNumber.id)}
+                                        disabled={!canEditSenderNumbers}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
@@ -497,18 +556,11 @@ export function SenderNumberSettings({
           </DialogHeader>
           <p className="py-4">この送信者番号を削除してもよろしいですか？この操作は元に戻せません。</p>
           <DialogFooter>
+            <Button onClick={() => setDeleteDialogOpen(false)}>キャンセル</Button>
             <Button 
-              className="bg-gray-100 text-gray-700 hover:bg-gray-200" 
-              onClick={() => setDeleteDialogOpen(false)}
-            >
-              キャンセル
-            </Button>
-            <Button 
-              className="bg-red-500 text-white hover:bg-red-600" 
               onClick={handleDeleteSenderNumber}
-              disabled={isLoading}
+              className="bg-red-600 text-white hover:bg-red-700"
             >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               削除
             </Button>
           </DialogFooter>

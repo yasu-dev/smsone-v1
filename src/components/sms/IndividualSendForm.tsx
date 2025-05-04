@@ -292,16 +292,17 @@ const IndividualSendForm: React.FC = () => {
     setShowAdvancedOptions(false);
   };
 
+  // 送信者名変更ハンドラ
   const handleSenderNumberChange = (number: string) => {
     setSenderNumber(number);
     
     // 送信者名が国際送信対応かチェック
     const selectedSender = useSenderNumberStore.getState().senderNumbers.find(sn => sn.number === number);
     if (selectedSender && selectedSender.isInternational) {
-      // 国際送信対応の送信者名が選択された場合、国際送信モードを有効化
+      // 海外送信対応の送信者名が選択された場合、海外送信モードを有効化
       setIsInternational(true);
     } else {
-      // 通常の電話番号が選択された場合は国際送信モードを無効化
+      // 通常の電話番号が選択された場合は海外送信モードを無効化
       setIsInternational(false);
       setCountryCode(undefined);
     }
@@ -459,7 +460,13 @@ const IndividualSendForm: React.FC = () => {
                 <SenderNumberSelect 
                   onChange={handleSenderNumberChange}
                   initialSenderNumber={senderNumber}
-                  disabled={false}
+                  disabled={isSending}
+                  onSenderTypeChange={(isIntl) => {
+                    setIsInternational(isIntl);
+                    if (!isIntl) {
+                      setCountryCode(undefined);
+                    }
+                  }}
                 />
               </motion.div>
               

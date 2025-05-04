@@ -8,6 +8,7 @@ import MessageHistory from './pages/MessageHistory';
 import Templates from './pages/Templates';
 import Settings from './pages/Settings';
 import UserManagement from './pages/UserManagement';
+import TenantUserManagement from './pages/TenantUserManagement';
 import ShortenerTools from './pages/ShortenerTools';
 import Analytics from './pages/Analytics';
 import Surveys from './pages/Surveys';
@@ -24,11 +25,14 @@ import BillingUserList from './pages/BillingUserList';
 import BillingAnalytics from './pages/BillingAnalytics';
 import InvoiceEdit from './pages/InvoiceEdit';
 import InvoiceReceived from './pages/InvoiceReceived';
+import InvoiceManagement from './pages/InvoiceManagement';
+import InvoiceCreate from './pages/InvoiceCreate';
 import TenantManagement from './pages/TenantManagement';
 import useAuthStore from './store/authStore';
 import TagManagement from './pages/TagManagement';
 import Support from './pages/Support';
 import BillingEndUserList from './pages/BillingEndUserList';
+import FAQManagement from './pages/FAQManagement';
 
 // エラーバウンダリーのコンポーネント
 const ErrorBoundary = () => {
@@ -147,9 +151,21 @@ const router = createBrowserRouter([
           {
             path: 'users',
             element: (
-              <RoleRoute role={['SYSTEM_ADMIN', 'TENANT_ADMIN']}>
+              <RoleRoute role={['SYSTEM_ADMIN']}>
                 <PermissionRoute permission="userManagement">
                   <UserManagement />
+                </PermissionRoute>
+              </RoleRoute>
+            )
+          },
+          
+          // テナント利用者管理画面 - TENANT_ADMINのみアクセス可能
+          {
+            path: 'tenant-users',
+            element: (
+              <RoleRoute role={['TENANT_ADMIN']}>
+                <PermissionRoute permission="userManagement">
+                  <TenantUserManagement />
                 </PermissionRoute>
               </RoleRoute>
             )
@@ -177,7 +193,7 @@ const router = createBrowserRouter([
             )
           },
           
-          // サービス利用者向け請求管理画面 - SYSTEM_ADMINのみアクセス可能
+          // 利用者向け請求管理画面 - SYSTEM_ADMINのみアクセス可能
           {
             path: 'billing/endusers',
             element: (
@@ -196,6 +212,42 @@ const router = createBrowserRouter([
               <RoleRoute role={['SYSTEM_ADMIN', 'TENANT_ADMIN', 'OPERATION_ADMIN']}>
                 <PermissionRoute permission="billingAccess">
                   <BillingManagement />
+                </PermissionRoute>
+              </RoleRoute>
+            )
+          },
+          
+          // 請求書管理画面 - SYSTEM_ADMIN, TENANT_ADMINがアクセス可能
+          {
+            path: 'invoices',
+            element: (
+              <RoleRoute role={['SYSTEM_ADMIN', 'TENANT_ADMIN']}>
+                <PermissionRoute permission="billingAccess">
+                  <InvoiceManagement />
+                </PermissionRoute>
+              </RoleRoute>
+            )
+          },
+          
+          // 請求書作成画面 - SYSTEM_ADMIN, TENANT_ADMINがアクセス可能
+          {
+            path: 'invoices/new',
+            element: (
+              <RoleRoute role={['SYSTEM_ADMIN', 'TENANT_ADMIN']}>
+                <PermissionRoute permission="billingAccess">
+                  <InvoiceCreate />
+                </PermissionRoute>
+              </RoleRoute>
+            )
+          },
+          
+          // 請求書編集画面 - SYSTEM_ADMIN, TENANT_ADMINがアクセス可能
+          {
+            path: 'invoices/:id',
+            element: (
+              <RoleRoute role={['SYSTEM_ADMIN', 'TENANT_ADMIN']}>
+                <PermissionRoute permission="billingAccess">
+                  <InvoiceCreate isEdit={true} />
                 </PermissionRoute>
               </RoleRoute>
             )
@@ -286,6 +338,16 @@ const router = createBrowserRouter([
           {
             path: 'support',
             element: <Support />
+          },
+          
+          // FAQ管理画面 - SYSTEM_ADMINのみアクセス可能
+          {
+            path: 'faq-management',
+            element: (
+              <RoleRoute role={['SYSTEM_ADMIN']}>
+                <FAQManagement />
+              </RoleRoute>
+            )
           },
           
           {

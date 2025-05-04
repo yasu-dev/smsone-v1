@@ -58,7 +58,7 @@ const BillingEndUserList: React.FC = () => {
     >
       <div className="flex items-center justify-between border-b border-grey-200 pb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-grey-900">サービス利用者向け請求管理</h1>
+          <h1 className="text-2xl font-semibold text-grey-900">利用者向け請求管理</h1>
         </div>
       </div>
 
@@ -139,21 +139,21 @@ const BillingEndUserList: React.FC = () => {
                 <tbody className="bg-white divide-y divide-grey-200">
                   {filteredUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-grey-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm font-medium text-grey-900">{user.username}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-grey-500">{user.company}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-grey-500">{user.email}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <div className="text-sm text-grey-900">
                           {new Intl.NumberFormat('ja-JP', { style: 'currency', currency: 'JPY' }).format(user.monthlyFee)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           user.status === 'active' ? 'bg-green-100 text-green-800' :
                           user.status === 'inactive' ? 'bg-grey-100 text-grey-800' :
@@ -166,7 +166,7 @@ const BillingEndUserList: React.FC = () => {
                            'キャンセル'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-grey-500">
+                      <td className="px-6 py-4 text-sm text-grey-500">
                         <button
                           onClick={() => handleUserClick(user)}
                           className="text-primary-600 hover:text-primary-900"
